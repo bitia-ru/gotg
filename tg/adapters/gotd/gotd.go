@@ -33,10 +33,7 @@ type Tg struct {
 
 	isStarted bool
 
-	codeRequestHandler func() string
-	onStartHandler     func(ctx context.Context)
-	authHandler        func() tg.AuthConfig
-	newMessageHandler  func(*tg.Message)
+	handlers tg.Handlers
 }
 
 func sessionFolder(phone string) string {
@@ -122,8 +119,8 @@ func (t *Tg) Start(ctx context.Context) error {
 				t.password,
 				gotdAuth.CodeAuthenticatorFunc(
 					func(ctx context.Context, sentCode *gotdTg.AuthSentCode) (string, error) {
-						if t.codeRequestHandler != nil {
-							return t.codeRequestHandler(), nil
+						if t.handlers.CodeRequest != nil {
+							return t.handlers.CodeRequest(), nil
 						}
 
 						return "", errors.New("code request handler is not set")
@@ -161,15 +158,11 @@ func (t *Tg) Start(ctx context.Context) error {
 			IsBot: t.self.Bot,
 		}
 
-		if t.onStartHandler != nil {
-			authOptions.OnStart = t.onStartHandler
-		}
-
 		authOptions.OnStart = func(ctx context.Context) {
 			t.isStarted = true
 
-			if t.onStartHandler != nil {
-				t.onStartHandler(ctx)
+			if t.handlers.Start != nil {
+				t.handlers.Start(ctx)
 			}
 		}
 
@@ -181,16 +174,8 @@ func (t *Tg) Start(ctx context.Context) error {
 	return nil
 }
 
-func (t *Tg) SetNewMessageHandler(h func(*tg.Message)) {
-	t.newMessageHandler = h
-}
-
-func (t *Tg) SetOnCodeRequestHandler(h func() string) {
-	t.codeRequestHandler = h
-}
-
-func (t *Tg) SetOnStartHandler(h func(ctx context.Context)) {
-	t.onStartHandler = h
+func (t *Tg) Handlers() *tg.Handlers {
+	return &t.handlers
 }
 
 func (t *Tg) phonePassedNormalized() string {

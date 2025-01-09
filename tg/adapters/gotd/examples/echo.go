@@ -22,7 +22,7 @@ func main() {
 
 	var c tg.Tg = gotd.NewTgClient(appId, os.Getenv("TG_APP_HASH"), os.Getenv("TG_PHONE"), os.Getenv("TG_PASSWORD"))
 
-	c.SetOnCodeRequestHandler(func() string {
+	c.Handlers().CodeRequest = func() string {
 		fmt.Print("Enter code: ")
 		code, err := bufio.NewReader(os.Stdin).ReadString('\n')
 
@@ -31,7 +31,7 @@ func main() {
 		}
 
 		return strings.TrimSpace(code)
-	})
+	}
 
 	/*c.SetNewMessageHandler(func(m *tg.Message) {
 		err := c.SendMessage(m.From, m.Message)
@@ -41,11 +41,11 @@ func main() {
 		}
 	})*/
 
-	c.SetOnStartHandler(func(ctx context.Context) {
+	c.Handlers().Start = func(ctx context.Context) {
 		self, _ := c.Self()
 
 		fmt.Printf("Started (phone: %s username: %s first name: %s)\n", self.Phone, self.Username, self.FirstName)
-	})
+	}
 
 	err = c.Start(ctx)
 
