@@ -33,18 +33,20 @@ func main() {
 		return strings.TrimSpace(code)
 	}
 
-	/*c.SetNewMessageHandler(func(m *tg.Message) {
-		err := c.SendMessage(m.From, m.Message)
-
-		if err != nil {
-			t.Errorf("Error: %s", err)
-		}
-	})*/
-
 	c.Handlers().Start = func(ctx context.Context) {
 		self, _ := c.Self()
 
 		fmt.Printf("Started (phone: %s username: %s first name: %s)\n", self.Phone, self.Username, self.FirstName)
+	}
+
+	c.Handlers().NewMessage = func(m *tg.Message) {
+		fmt.Printf("Message: %s\n", m.Message)
+
+		/*err := c.SendMessage(m.From, m.Message)
+
+		if err != nil {
+			t.Errorf("Error: %s", err)
+		}*/
 	}
 
 	err = c.Start(ctx)

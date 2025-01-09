@@ -23,17 +23,19 @@ import (
 )
 
 type Tg struct {
-	phone          string
-	password       string
+	phone    string
+	password string
+
+	isStarted bool
+
+	handlers tg.Handlers
+
 	sessionStorage *telegram.FileSessionStorage
 	updatesManager *gotdUpdates.Manager
 	client         *telegram.Client
 	api            *gotdTg.Client
 	self           *gotdTg.User
-
-	isStarted bool
-
-	handlers tg.Handlers
+	dispatcher     *gotdTg.UpdateDispatcher
 }
 
 func sessionFolder(phone string) string {
@@ -102,6 +104,7 @@ func NewTgClient(appID int, appHash string, phone string, password string) *Tg {
 		updatesManager: updatesManager,
 		client:         client,
 		api:            client.API(),
+		dispatcher:     &dispatcher,
 	}
 }
 
@@ -165,6 +168,38 @@ func (t *Tg) Start(ctx context.Context) error {
 				t.handlers.Start(ctx)
 			}
 		}
+
+		t.dispatcher.OnNewMessage(func(ctx context.Context, e gotdTg.Entities, u *gotdTg.UpdateNewMessage) error {
+			msg, ok := u.Message.(*gotdTg.Message)
+			if !ok {
+				// Ignore service messages.
+				return nil
+			}
+
+			if t.handlers.NewMessage != nil {
+				t.handlers.NewMessage(&tg.Message{
+					Message: msg.Message,
+				})
+			}
+
+			return nil
+		})
+
+		t.dispatcher.OnNewChannelMessage(func(ctx context.Context, e gotdTg.Entities, u *gotdTg.UpdateNewChannelMessage) error {
+			msg, ok := u.Message.(*gotdTg.Message)
+			if !ok {
+				// Ignore service messages.
+				return nil
+			}
+
+			if t.handlers.NewMessage != nil {
+				t.handlers.NewMessage(&tg.Message{
+					Message: msg.Message,
+				})
+			}
+
+			return nil
+		})
 
 		return t.updatesManager.Run(ctx, t.api, self.ID, authOptions)
 	}); err != nil {
