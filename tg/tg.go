@@ -23,6 +23,7 @@ type Tg interface {
 	Start(ctx context.Context) error
 	SetNewMessageHandler(func(*Message))
 	SetOnStartHandler(func(ctx context.Context))
+	SetOnCodeRequestHandler(func() string)
 
 	Self() (*User, error)
 }

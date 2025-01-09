@@ -1,7 +1,6 @@
 package gotd
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"github.com/bitia-ru/gotg/tg"
@@ -20,7 +19,6 @@ import (
 	"golang.org/x/time/rate"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -35,9 +33,10 @@ type Tg struct {
 
 	isStarted bool
 
-	onStartHandler    func(ctx context.Context)
-	authHandler       func() tg.AuthConfig
-	newMessageHandler func(*tg.Message)
+	codeRequestHandler func() string
+	onStartHandler     func(ctx context.Context)
+	authHandler        func() tg.AuthConfig
+	newMessageHandler  func(*tg.Message)
 }
 
 func sessionFolder(phone string) string {
@@ -123,14 +122,11 @@ func (t *Tg) Start(ctx context.Context) error {
 				t.password,
 				gotdAuth.CodeAuthenticatorFunc(
 					func(ctx context.Context, sentCode *gotdTg.AuthSentCode) (string, error) {
-						fmt.Print("Enter code: ")
-						code, err := bufio.NewReader(os.Stdin).ReadString('\n')
-
-						if err != nil {
-							return "", err
+						if t.codeRequestHandler != nil {
+							return t.codeRequestHandler(), nil
 						}
 
-						return strings.TrimSpace(code), nil
+						return "", errors.New("code request handler is not set")
 					},
 				),
 			)
@@ -187,6 +183,10 @@ func (t *Tg) Start(ctx context.Context) error {
 
 func (t *Tg) SetNewMessageHandler(h func(*tg.Message)) {
 	t.newMessageHandler = h
+}
+
+func (t *Tg) SetOnCodeRequestHandler(h func() string) {
+	t.codeRequestHandler = h
 }
 
 func (t *Tg) SetOnStartHandler(h func(ctx context.Context)) {

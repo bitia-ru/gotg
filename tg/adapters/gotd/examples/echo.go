@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"github.com/bitia-ru/gotg/tg"
 	"github.com/bitia-ru/gotg/tg/adapters/gotd"
 	"os"
 	"strconv"
+	"strings"
 )
 
 func main() {
@@ -19,6 +21,17 @@ func main() {
 	}
 
 	var c tg.Tg = gotd.NewTgClient(appId, os.Getenv("TG_APP_HASH"), os.Getenv("TG_PHONE"), os.Getenv("TG_PASSWORD"))
+
+	c.SetOnCodeRequestHandler(func() string {
+		fmt.Print("Enter code: ")
+		code, err := bufio.NewReader(os.Stdin).ReadString('\n')
+
+		if err != nil {
+			return ""
+		}
+
+		return strings.TrimSpace(code)
+	})
 
 	/*c.SetNewMessageHandler(func(m *tg.Message) {
 		err := c.SendMessage(m.From, m.Message)
