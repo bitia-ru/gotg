@@ -11,7 +11,7 @@ type AuthConfig struct {
 type Handlers struct {
 	Start       func(ctx context.Context)
 	CodeRequest func() string
-	NewMessage  func(m *Message)
+	NewMessage  func(m Message)
 }
 
 type User struct {
@@ -19,10 +19,6 @@ type User struct {
 	Phone     string
 	FirstName string
 	LastName  string
-}
-
-type Message struct {
-	Message string
 }
 
 type Tg interface {

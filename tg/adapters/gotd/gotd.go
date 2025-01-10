@@ -177,9 +177,23 @@ func (t *Tg) Start(ctx context.Context) error {
 			}
 
 			if t.handlers.NewMessage != nil {
-				t.handlers.NewMessage(&tg.Message{
-					Message: msg.Message,
-				})
+				message := tg.ChatMessage{
+					ContentString: msg.Message,
+				}
+
+				peerUser, ok := msg.PeerID.(*gotdTg.PeerUser)
+
+				if ok {
+					for _, users := range e.Users {
+						if users.ID == peerUser.UserID {
+							message.Peer = &tg.UserPeer{
+								Username: users.Username,
+							}
+						}
+					}
+				}
+
+				t.handlers.NewMessage(&message)
 			}
 
 			return nil
@@ -193,9 +207,23 @@ func (t *Tg) Start(ctx context.Context) error {
 			}
 
 			if t.handlers.NewMessage != nil {
-				t.handlers.NewMessage(&tg.Message{
-					Message: msg.Message,
-				})
+				message := tg.ChatMessage{
+					ContentString: msg.Message,
+				}
+
+				peerUser, ok := msg.PeerID.(*gotdTg.PeerUser)
+
+				if ok {
+					for _, users := range e.Users {
+						if users.ID == peerUser.UserID {
+							message.Peer = &tg.UserPeer{
+								Username: users.Username,
+							}
+						}
+					}
+				}
+
+				t.handlers.NewMessage(&message)
 			}
 
 			return nil

@@ -39,8 +39,12 @@ func main() {
 		fmt.Printf("Started (phone: %s username: %s first name: %s)\n", self.Phone, self.Username, self.FirstName)
 	}
 
-	c.Handlers().NewMessage = func(m *tg.Message) {
-		fmt.Printf("Message: %s\n", m.Message)
+	c.Handlers().NewMessage = func(m tg.Message) {
+		if m.From() == nil {
+			fmt.Printf("Message with content: %s\n", m.Content())
+		} else {
+			fmt.Printf("Message from %s with content: %s\n", m.From().String(), m.Content())
+		}
 
 		/*err := c.SendMessage(m.From, m.Message)
 
