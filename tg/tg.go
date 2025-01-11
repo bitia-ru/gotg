@@ -14,13 +14,6 @@ type Handlers struct {
 	NewMessage  func(m Message)
 }
 
-type User struct {
-	Username  string
-	Phone     string
-	FirstName string
-	LastName  string
-}
-
 type Tg interface {
 	Start(ctx context.Context) error
 	Self() (*User, error)

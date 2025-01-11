@@ -40,11 +40,21 @@ func main() {
 	}
 
 	c.Handlers().NewMessage = func(m tg.Message) {
-		if m.From() == nil {
-			fmt.Printf("Message with content: %s\n", m.Content())
-		} else {
-			fmt.Printf("Message from %s with content: %s\n", m.From().String(), m.Content())
+		logMsg := "Message"
+
+		if m.Sender() != nil {
+			logMsg += " from " + m.Sender().Name()
 		}
+
+		if m.IsForwarded() {
+			logMsg += " forwarded from " + m.Author().Name()
+		}
+
+		if m.Where() != nil {
+			logMsg += " in " + m.Where().Name()
+		}
+
+		fmt.Println(logMsg + ": " + m.Content())
 
 		/*err := c.SendMessage(m.From, m.Message)
 

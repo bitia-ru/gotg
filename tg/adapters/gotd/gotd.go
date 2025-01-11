@@ -169,6 +169,95 @@ func (t *Tg) Start(ctx context.Context) error {
 			}
 		}
 
+		messageProcessor := func(ctx context.Context, e gotdTg.Entities, msg *gotdTg.Message) error {
+			if t.handlers.NewMessage != nil {
+				message := tg.ChatMessage{
+					ChatMessageData: tg.ChatMessageData{
+						Content: msg.Message,
+					},
+				}
+
+				from, ok := msg.GetFromID()
+
+				if ok {
+					switch from := from.(type) {
+					case *gotdTg.PeerUser:
+						for _, gotdUser := range e.Users {
+							if gotdUser.ID == from.UserID {
+								message.FromPeer = &tg.UserPeer{
+									User: *UserFromGotdUser(gotdUser),
+								}
+							}
+						}
+					default:
+						_, _ = fmt.Fprintf(os.Stderr, "Unknown from type: %T\n", from)
+					}
+				}
+
+				fwdFrom, ok := msg.GetFwdFrom()
+
+				if ok {
+					fwdFromID, ok := fwdFrom.GetFromID()
+
+					if ok {
+						switch fwdFrom := fwdFromID.(type) {
+						case *gotdTg.PeerUser:
+							for _, gotdUser := range e.Users {
+								if gotdUser.ID == fwdFrom.UserID {
+									message.FwdFromPeer = &tg.UserPeer{
+										User: *UserFromGotdUser(gotdUser),
+									}
+								}
+							}
+						case *gotdTg.PeerChannel:
+							for _, channel := range e.Channels {
+								if channel.ID == fwdFrom.ChannelID {
+									message.FwdFromPeer = &tg.ChannelPeer{
+										Channel: *ChannelFromGotdChannel(channel),
+									}
+								}
+							}
+						default:
+							_, _ = fmt.Fprintf(os.Stderr, "Unknown fwd from type: %T\n", fwdFrom)
+						}
+					}
+				}
+
+				switch peer := msg.PeerID.(type) {
+				case *gotdTg.PeerUser:
+					for _, gotdUser := range e.Users {
+						if gotdUser.ID == peer.UserID {
+							message.ChatMessageData.Peer = &tg.UserPeer{
+								User: *UserFromGotdUser(gotdUser),
+							}
+						}
+					}
+				case *gotdTg.PeerChat:
+					for _, chat := range e.Chats {
+						if chat.ID == peer.ChatID {
+							message.ChatMessageData.Peer = &tg.ChatPeer{
+								Chat: *ChatFromGotdChat(chat),
+							}
+						}
+					}
+				case *gotdTg.PeerChannel:
+					for _, channel := range e.Channels {
+						if channel.ID == peer.ChannelID {
+							message.ChatMessageData.Peer = &tg.ChannelPeer{
+								Channel: *ChannelFromGotdChannel(channel),
+							}
+						}
+					}
+				default:
+					_, _ = fmt.Fprintf(os.Stderr, "Unknown peer type: %T\n", peer)
+				}
+
+				t.handlers.NewMessage(&message)
+			}
+
+			return nil
+		}
+
 		t.dispatcher.OnNewMessage(func(ctx context.Context, e gotdTg.Entities, u *gotdTg.UpdateNewMessage) error {
 			msg, ok := u.Message.(*gotdTg.Message)
 			if !ok {
@@ -176,27 +265,7 @@ func (t *Tg) Start(ctx context.Context) error {
 				return nil
 			}
 
-			if t.handlers.NewMessage != nil {
-				message := tg.ChatMessage{
-					ContentString: msg.Message,
-				}
-
-				peerUser, ok := msg.PeerID.(*gotdTg.PeerUser)
-
-				if ok {
-					for _, users := range e.Users {
-						if users.ID == peerUser.UserID {
-							message.Peer = &tg.UserPeer{
-								Username: users.Username,
-							}
-						}
-					}
-				}
-
-				t.handlers.NewMessage(&message)
-			}
-
-			return nil
+			return messageProcessor(ctx, e, msg)
 		})
 
 		t.dispatcher.OnNewChannelMessage(func(ctx context.Context, e gotdTg.Entities, u *gotdTg.UpdateNewChannelMessage) error {
@@ -206,27 +275,7 @@ func (t *Tg) Start(ctx context.Context) error {
 				return nil
 			}
 
-			if t.handlers.NewMessage != nil {
-				message := tg.ChatMessage{
-					ContentString: msg.Message,
-				}
-
-				peerUser, ok := msg.PeerID.(*gotdTg.PeerUser)
-
-				if ok {
-					for _, users := range e.Users {
-						if users.ID == peerUser.UserID {
-							message.Peer = &tg.UserPeer{
-								Username: users.Username,
-							}
-						}
-					}
-				}
-
-				t.handlers.NewMessage(&message)
-			}
-
-			return nil
+			return messageProcessor(ctx, e, msg)
 		})
 
 		return t.updatesManager.Run(ctx, t.api, self.ID, authOptions)
@@ -254,10 +303,5 @@ func (t *Tg) Self() (*tg.User, error) {
 		return nil, errors.New("client is not started yet")
 	}
 
-	return &tg.User{
-		Username:  t.self.Username,
-		Phone:     t.self.Phone,
-		FirstName: t.self.FirstName,
-		LastName:  t.self.LastName,
-	}, nil
+	return UserFromGotdUser(t.self), nil
 }
