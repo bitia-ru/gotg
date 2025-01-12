@@ -15,34 +15,30 @@ import (
 func main() {
 	ctx := context.Background()
 
-	appId, err := strconv.Atoi(os.Getenv("TG_APP_ID"))
+	botToken := os.Getenv("TG_BOT_TOKEN")
+	appHash := os.Getenv("TG_APP_HASH")
+	appId := utils.PanicOnErrorWrap(strconv.Atoi(os.Getenv("TG_APP_ID")))
 
-	if err != nil {
-		panic(err)
+	if botToken == "" {
+		panic("TG_BOT_TOKEN is required")
 	}
 
-	var c tg.Tg = gotd.NewTgClient(appId, os.Getenv("TG_APP_HASH"))
+	if appHash == "" {
+		panic("TG_APP_HASH is required")
+	}
+
+	var c tg.Tg = gotd.NewTgClient(appId, appHash)
 
 	c.Handlers().CodeRequest = func() string {
 		fmt.Print("Enter code: ")
-		code, err := bufio.NewReader(os.Stdin).ReadString('\n')
-
-		if err != nil {
-			return ""
-		}
+		code := utils.PanicOnErrorWrap(bufio.NewReader(os.Stdin).ReadString('\n'))
 
 		return strings.TrimSpace(code)
 	}
 
 	c.Handlers().Start = func(ctx context.Context) {
-		botToken := os.Getenv("TG_BOT_TOKEN")
-
-		if !utils.PanicOnError(c.IsAuthenticated(ctx)) {
-			err := c.AuthenticateAsBot(ctx, botToken)
-
-			if err != nil {
-				panic(err)
-			}
+		if !utils.PanicOnErrorWrap(c.IsAuthenticated(ctx)) {
+			utils.PanicOnError(c.AuthenticateAsBot(ctx, botToken))
 		}
 	}
 
@@ -52,7 +48,11 @@ func main() {
 		fmt.Printf("Started (username: %s)\n", self.Username)
 	}
 
-	c.Handlers().NewMessage = func(m tg.Message) {
+	c.Handlers().NewMessage = func(ctx context.Context, m tg.Message) {
+		if m.IsOutgoing() {
+			return
+		}
+
 		logMsg := "Message"
 
 		if m.Sender() != nil {
@@ -69,15 +69,11 @@ func main() {
 
 		fmt.Println(logMsg + ": " + m.Content())
 
-		/*switch m.Where().(type) {
+		switch m.Where().(type) {
 		case *tg.UserPeer:
-			m.Reply(m.Content())
-		}*/
+			utils.PanicOnError(c.Reply(ctx, m, m.Content()))
+		}
 	}
 
-	err = c.Start(ctx)
-
-	if err != nil {
-		fmt.Println(err)
-	}
+	utils.PanicOnError(c.Start(ctx))
 }

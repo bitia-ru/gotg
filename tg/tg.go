@@ -12,7 +12,7 @@ type Handlers struct {
 	Start       func(ctx context.Context)
 	Ready       func(ctx context.Context, self User)
 	CodeRequest func() string
-	NewMessage  func(m Message)
+	NewMessage  func(ctx context.Context, m Message)
 }
 
 type Tg interface {
@@ -27,4 +27,6 @@ type Tg interface {
 	Start(ctx context.Context) error
 
 	Handlers() *Handlers
+
+	Reply(ctx context.Context, to Message, content string) error
 }

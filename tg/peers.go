@@ -7,6 +7,7 @@ import (
 )
 
 type Peer interface {
+	ID() int64
 	Name() string
 }
 
@@ -20,10 +21,6 @@ type User struct {
 
 func (u *User) String() string {
 	return fmt.Sprintf("<User: %s>", u.Username)
-}
-
-func (u *User) Foo() string {
-	return "asdf"
 }
 
 type Chat struct {
@@ -48,7 +45,7 @@ type UserPeer struct {
 	User
 }
 
-func (u *UserPeer) Name() string {
+func (u UserPeer) Name() string {
 	if u.FirstName != "" || u.LastName != "" {
 		return strings.Join(
 			utils.Filter([]string{u.FirstName, u.LastName}, utils.NotEmptyFilter),
@@ -67,18 +64,30 @@ func (u *UserPeer) Name() string {
 	return fmt.Sprintf("<User: %d>", u.ID)
 }
 
+func (u UserPeer) ID() int64 {
+	return u.User.ID
+}
+
 type ChatPeer struct {
 	Chat
 }
 
-func (c *ChatPeer) Name() string {
+func (c ChatPeer) Name() string {
 	return c.Title
+}
+
+func (c ChatPeer) ID() int64 {
+	return c.Chat.ID
 }
 
 type ChannelPeer struct {
 	Channel
 }
 
-func (c *ChannelPeer) Name() string {
+func (c ChannelPeer) Name() string {
 	return c.Title
+}
+
+func (c ChannelPeer) ID() int64 {
+	return c.Channel.ID
 }

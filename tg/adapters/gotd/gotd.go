@@ -13,6 +13,7 @@ import (
 	"github.com/gotd/contrib/storage"
 	"github.com/gotd/td/telegram"
 	gotdAuth "github.com/gotd/td/telegram/auth"
+	"github.com/gotd/td/telegram/message"
 	gotdUpdates "github.com/gotd/td/telegram/updates"
 	gotdTg "github.com/gotd/td/tg"
 	bboltdb "go.etcd.io/bbolt"
@@ -168,22 +169,24 @@ func (t *Tg) Start(ctx context.Context) error {
 			}
 		}
 
-		messageProcessor := func(ctx context.Context, e gotdTg.Entities, msg *gotdTg.Message) error {
+		messageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message) error {
 			if t.handlers.NewMessage != nil {
-				message := tg.ChatMessage{
+				msg := tg.ChatMessage{
 					ChatMessageData: tg.ChatMessageData{
-						Content: msg.Message,
+						ID:         int64(gotdMsg.ID),
+						Content:    gotdMsg.Message,
+						IsOutgoing: gotdMsg.Out,
 					},
 				}
 
-				from, ok := msg.GetFromID()
+				from, ok := gotdMsg.GetFromID()
 
 				if ok {
 					switch from := from.(type) {
 					case *gotdTg.PeerUser:
 						for _, gotdUser := range e.Users {
 							if gotdUser.ID == from.UserID {
-								message.FromPeer = &tg.UserPeer{
+								msg.FromPeer = &tg.UserPeer{
 									User: *UserFromGotdUser(gotdUser),
 								}
 							}
@@ -193,7 +196,7 @@ func (t *Tg) Start(ctx context.Context) error {
 					}
 				}
 
-				fwdFrom, ok := msg.GetFwdFrom()
+				fwdFrom, ok := gotdMsg.GetFwdFrom()
 
 				if ok {
 					fwdFromID, ok := fwdFrom.GetFromID()
@@ -203,7 +206,7 @@ func (t *Tg) Start(ctx context.Context) error {
 						case *gotdTg.PeerUser:
 							for _, gotdUser := range e.Users {
 								if gotdUser.ID == fwdFrom.UserID {
-									message.FwdFromPeer = &tg.UserPeer{
+									msg.FwdFromPeer = &tg.UserPeer{
 										User: *UserFromGotdUser(gotdUser),
 									}
 								}
@@ -211,7 +214,7 @@ func (t *Tg) Start(ctx context.Context) error {
 						case *gotdTg.PeerChannel:
 							for _, channel := range e.Channels {
 								if channel.ID == fwdFrom.ChannelID {
-									message.FwdFromPeer = &tg.ChannelPeer{
+									msg.FwdFromPeer = &tg.ChannelPeer{
 										Channel: *ChannelFromGotdChannel(channel),
 									}
 								}
@@ -222,11 +225,11 @@ func (t *Tg) Start(ctx context.Context) error {
 					}
 				}
 
-				switch peer := msg.PeerID.(type) {
+				switch peer := gotdMsg.PeerID.(type) {
 				case *gotdTg.PeerUser:
 					for _, gotdUser := range e.Users {
 						if gotdUser.ID == peer.UserID {
-							message.ChatMessageData.Peer = &tg.UserPeer{
+							msg.ChatMessageData.Peer = &tg.UserPeer{
 								User: *UserFromGotdUser(gotdUser),
 							}
 						}
@@ -234,7 +237,7 @@ func (t *Tg) Start(ctx context.Context) error {
 				case *gotdTg.PeerChat:
 					for _, chat := range e.Chats {
 						if chat.ID == peer.ChatID {
-							message.ChatMessageData.Peer = &tg.ChatPeer{
+							msg.ChatMessageData.Peer = &tg.ChatPeer{
 								Chat: *ChatFromGotdChat(chat),
 							}
 						}
@@ -242,7 +245,7 @@ func (t *Tg) Start(ctx context.Context) error {
 				case *gotdTg.PeerChannel:
 					for _, channel := range e.Channels {
 						if channel.ID == peer.ChannelID {
-							message.ChatMessageData.Peer = &tg.ChannelPeer{
+							msg.ChatMessageData.Peer = &tg.ChannelPeer{
 								Channel: *ChannelFromGotdChannel(channel),
 							}
 						}
@@ -251,7 +254,7 @@ func (t *Tg) Start(ctx context.Context) error {
 					_, _ = fmt.Fprintf(os.Stderr, "Unknown peer type: %T\n", peer)
 				}
 
-				t.handlers.NewMessage(&message)
+				t.handlers.NewMessage(ctx, &msg)
 			}
 
 			return nil
@@ -264,7 +267,14 @@ func (t *Tg) Start(ctx context.Context) error {
 				return nil
 			}
 
-			return messageProcessor(ctx, e, msg)
+			uc := updateContext{
+				entities: e,
+				update:   u,
+			}
+
+			ctxWithUpdate := context.WithValue(ctx, "gotd_update_context", uc)
+
+			return messageProcessor(ctxWithUpdate, e, msg)
 		})
 
 		t.dispatcher.OnNewChannelMessage(func(ctx context.Context, e gotdTg.Entities, u *gotdTg.UpdateNewChannelMessage) error {
@@ -274,7 +284,14 @@ func (t *Tg) Start(ctx context.Context) error {
 				return nil
 			}
 
-			return messageProcessor(ctx, e, msg)
+			uc := updateContext{
+				entities: e,
+				update:   u,
+			}
+
+			ctxWithUpdate := context.WithValue(ctx, "gotd_update_context", uc)
+
+			return messageProcessor(ctxWithUpdate, e, msg)
 		})
 
 		return t.updatesManager.Run(ctx, t.api, self.ID, authOptions)
@@ -287,4 +304,53 @@ func (t *Tg) Start(ctx context.Context) error {
 
 func (t *Tg) Handlers() *tg.Handlers {
 	return &t.handlers
+}
+
+func (t *Tg) Reply(ctx context.Context, to tg.Message, content string) error {
+	sender := message.NewSender(t.api)
+
+	gotdUpdateContext, ok := ctx.Value("gotd_update_context").(updateContext)
+
+	if !ok {
+		return errors.New("gotd update context not found")
+	}
+
+	amu, ok := gotdUpdateContext.update.(message.AnswerableMessageUpdate)
+
+	if !ok {
+		return errors.New("unexpected update type")
+	}
+
+	gotdMsg, ok := amu.GetMessage().(*gotdTg.Message)
+
+	if !ok {
+		return errors.New("unexpected message type")
+	}
+
+	notCurrentUpdateMsgErr := errors.New(
+		"Replying not to current update message has not implemented yet",
+	)
+
+	if int64(gotdMsg.GetID()) != to.ID() {
+		return notCurrentUpdateMsgErr
+	}
+
+	switch p := gotdMsg.PeerID.(type) {
+	case *gotdTg.PeerUser:
+		if p.UserID != to.Where().ID() {
+			return notCurrentUpdateMsgErr
+		}
+	case *gotdTg.PeerChat:
+		if p.ChatID != to.Where().ID() {
+			return notCurrentUpdateMsgErr
+		}
+	}
+
+	_, err := sender.Reply(gotdUpdateContext.entities, amu).Text(ctx, content)
+
+	if err != nil {
+		return errors.Wrap(err, "send reply")
+	}
+
+	return nil
 }

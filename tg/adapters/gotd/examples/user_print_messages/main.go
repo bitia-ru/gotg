@@ -16,8 +16,12 @@ func main() {
 	ctx := context.Background()
 	phone := os.Getenv("TG_PHONE")
 	password := os.Getenv("TG_PASSWORD")
+	appId := utils.PanicOnErrorWrap(strconv.Atoi(os.Getenv("TG_APP_ID")))
+	appHash := os.Getenv("TG_APP_HASH")
 
-	appId := utils.PanicOnError(strconv.Atoi(os.Getenv("TG_APP_ID")))
+	if appHash == "" {
+		panic("TG_APP_HASH is required")
+	}
 
 	var c tg.Tg = gotd.NewTgClient(appId, os.Getenv("TG_APP_HASH"))
 
@@ -33,7 +37,7 @@ func main() {
 	}
 
 	c.Handlers().Start = func(ctx context.Context) {
-		if !utils.PanicOnError(c.IsAuthenticated(ctx)) {
+		if !utils.PanicOnErrorWrap(c.IsAuthenticated(ctx)) {
 			err := c.AuthenticateAsUser(ctx, phone, password, func() string {
 				fmt.Print("Enter code: ")
 				code, err := bufio.NewReader(os.Stdin).ReadString('\n')
@@ -86,12 +90,6 @@ func main() {
 		}
 
 		fmt.Println(logMsg + ": " + m.Content())
-
-		/*err := c.SendMessage(m.From, m.Message)
-
-		if err != nil {
-			t.Errorf("Error: %s", err)
-		}*/
 	}
 
 	err := c.Start(ctx)
