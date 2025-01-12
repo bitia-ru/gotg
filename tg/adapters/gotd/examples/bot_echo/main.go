@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/bitia-ru/gotg/tg"
 	"github.com/bitia-ru/gotg/tg/adapters/gotd"
+	"github.com/bitia-ru/gotg/utils"
 	"os"
 	"strconv"
 	"strings"
@@ -20,7 +21,7 @@ func main() {
 		panic(err)
 	}
 
-	var c tg.Tg = gotd.NewTgClient(appId, os.Getenv("TG_APP_HASH"), os.Getenv("TG_PHONE"), os.Getenv("TG_PASSWORD"))
+	var c tg.Tg = gotd.NewTgClient(appId, os.Getenv("TG_APP_HASH"))
 
 	c.Handlers().CodeRequest = func() string {
 		fmt.Print("Enter code: ")
@@ -34,9 +35,21 @@ func main() {
 	}
 
 	c.Handlers().Start = func(ctx context.Context) {
-		self, _ := c.Self()
+		botToken := os.Getenv("TG_BOT_TOKEN")
 
-		fmt.Printf("Started (phone: %s username: %s first name: %s)\n", self.Phone, self.Username, self.FirstName)
+		if !utils.PanicOnError(c.IsAuthenticated(ctx)) {
+			err := c.AuthenticateAsBot(ctx, botToken)
+
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	c.Handlers().Ready = func(ctx context.Context, self tg.User) {
+		// TODO: Detect BOT_TOKEN changes and re-authentication requirement.
+
+		fmt.Printf("Started (username: %s)\n", self.Username)
 	}
 
 	c.Handlers().NewMessage = func(m tg.Message) {
@@ -56,10 +69,9 @@ func main() {
 
 		fmt.Println(logMsg + ": " + m.Content())
 
-		/*err := c.SendMessage(m.From, m.Message)
-
-		if err != nil {
-			t.Errorf("Error: %s", err)
+		/*switch m.Where().(type) {
+		case *tg.UserPeer:
+			m.Reply(m.Content())
 		}*/
 	}
 

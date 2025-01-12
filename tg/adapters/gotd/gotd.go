@@ -23,18 +23,12 @@ import (
 )
 
 type Tg struct {
-	phone    string
-	password string
-
-	isStarted bool
-
 	handlers tg.Handlers
 
 	sessionStorage *telegram.FileSessionStorage
 	updatesManager *gotdUpdates.Manager
 	client         *telegram.Client
 	api            *gotdTg.Client
-	self           *gotdTg.User
 	dispatcher     *gotdTg.UpdateDispatcher
 }
 
@@ -48,7 +42,7 @@ func sessionFolder(phone string) string {
 	return "phone-" + string(out)
 }
 
-func NewTgClient(appID int, appHash string, phone string, password string) *Tg {
+func NewTgClient(appID int, appHash string) *Tg {
 	var sessionDirPath string
 	sessionSubDir := filepath.Join("session", sessionFolder( /*TODO: */ "foo"))
 
@@ -98,8 +92,6 @@ func NewTgClient(appID int, appHash string, phone string, password string) *Tg {
 	client := telegram.NewClient(appID, appHash, options)
 
 	return &Tg{
-		phone:          phone,
-		password:       password,
 		sessionStorage: sessionStorage,
 		updatesManager: updatesManager,
 		client:         client,
@@ -108,38 +100,57 @@ func NewTgClient(appID int, appHash string, phone string, password string) *Tg {
 	}
 }
 
+func (t *Tg) IsAuthenticated(ctx context.Context) (bool, error) {
+	status, err := t.client.Auth().Status(ctx)
+
+	if err != nil {
+		return false, errors.Wrap(err, "get auth status")
+	}
+
+	return status.Authorized, nil
+}
+
+func (t *Tg) AuthenticateAsUser(
+	ctx context.Context,
+	phone string,
+	password string,
+	codeHandler func() string,
+) error {
+	constantAuthenticator := gotdAuth.Constant(
+		phone,
+		password,
+		gotdAuth.CodeAuthenticatorFunc(
+			func(ctx context.Context, sentCode *gotdTg.AuthSentCode) (string, error) {
+				return codeHandler(), nil
+			},
+		),
+	)
+
+	f := gotdAuth.NewFlow(constantAuthenticator, gotdAuth.SendCodeOptions{
+		AllowFlashCall: false,
+		CurrentNumber:  false,
+		AllowAppHash:   false,
+	})
+
+	if err := f.Run(ctx, t.client.Auth()); err != nil {
+		return errors.Wrap(err, "run auth flow")
+	}
+
+	return nil
+}
+
+func (t *Tg) AuthenticateAsBot(ctx context.Context, token string) error {
+	if _, err := t.client.Auth().Bot(ctx, token); err != nil {
+		return errors.Wrap(err, "login")
+	}
+
+	return nil
+}
+
 func (t *Tg) Start(ctx context.Context) error {
 	if err := t.client.Run(ctx, func(ctx context.Context) error {
-		status, err := t.client.Auth().Status(ctx)
-
-		if err != nil {
-			return errors.Wrap(err, "get auth status")
-		}
-
-		if !status.Authorized {
-			constantAuthenticator := gotdAuth.Constant(
-				t.phone,
-				t.password,
-				gotdAuth.CodeAuthenticatorFunc(
-					func(ctx context.Context, sentCode *gotdTg.AuthSentCode) (string, error) {
-						if t.handlers.CodeRequest != nil {
-							return t.handlers.CodeRequest(), nil
-						}
-
-						return "", errors.New("code request handler is not set")
-					},
-				),
-			)
-
-			f := gotdAuth.NewFlow(constantAuthenticator, gotdAuth.SendCodeOptions{
-				AllowFlashCall: false,
-				CurrentNumber:  false,
-				AllowAppHash:   false,
-			})
-
-			if err := f.Run(ctx, t.client.Auth()); err != nil {
-				return errors.Wrap(err, "run auth flow")
-			}
+		if t.handlers.Start != nil {
+			t.handlers.Start(ctx)
 		}
 
 		self, err := t.client.Self(ctx)
@@ -147,25 +158,13 @@ func (t *Tg) Start(ctx context.Context) error {
 			return errors.Wrap(err, "call self")
 		}
 
-		t.self = self
-
-		if t.self.Phone != t.phonePassedNormalized() {
-			return fmt.Errorf(
-				"phone mismatch (%s vs %s); re-authentication required",
-				t.self.Phone,
-				t.phonePassedNormalized(),
-			)
-		}
-
 		authOptions := gotdUpdates.AuthOptions{
-			IsBot: t.self.Bot,
+			IsBot: self.Bot,
 		}
 
 		authOptions.OnStart = func(ctx context.Context) {
-			t.isStarted = true
-
-			if t.handlers.Start != nil {
-				t.handlers.Start(ctx)
+			if t.handlers.Ready != nil {
+				t.handlers.Ready(ctx, *UserFromGotdUser(self))
 			}
 		}
 
@@ -288,20 +287,4 @@ func (t *Tg) Start(ctx context.Context) error {
 
 func (t *Tg) Handlers() *tg.Handlers {
 	return &t.handlers
-}
-
-func (t *Tg) phonePassedNormalized() string {
-	if t.phone[0] == '+' {
-		return t.phone[1:]
-	}
-
-	return t.phone
-}
-
-func (t *Tg) Self() (*tg.User, error) {
-	if !t.isStarted {
-		return nil, errors.New("client is not started yet")
-	}
-
-	return UserFromGotdUser(t.self), nil
 }
