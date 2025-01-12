@@ -10,7 +10,7 @@ type AuthConfig struct {
 
 type Handlers struct {
 	Start       func(ctx context.Context)
-	Ready       func(ctx context.Context, self User)
+	Ready       func(ctx context.Context, self PeerUser)
 	CodeRequest func() string
 	NewMessage  func(ctx context.Context, m Message)
 }

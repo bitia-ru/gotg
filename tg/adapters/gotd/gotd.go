@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/bitia-ru/gotg/tg"
+	"github.com/bitia-ru/gotg/utils"
 	pebbledb "github.com/cockroachdb/pebble"
 	"github.com/go-faster/errors"
 	"github.com/gotd/contrib/bbolt"
@@ -165,103 +166,149 @@ func (t *Tg) Start(ctx context.Context) error {
 
 		authOptions.OnStart = func(ctx context.Context) {
 			if t.handlers.Ready != nil {
-				t.handlers.Ready(ctx, *UserFromGotdUser(self))
+				t.handlers.Ready(ctx, UserFromGotdUser(self))
 			}
 		}
 
-		messageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message) error {
-			if t.handlers.NewMessage != nil {
-				msg := tg.ChatMessage{
-					ChatMessageData: tg.ChatMessageData{
-						ID:         int64(gotdMsg.ID),
-						Content:    gotdMsg.Message,
-						IsOutgoing: gotdMsg.Out,
-					},
+		dialogMessageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *BasicMessage) (tg.Message, error) {
+			msg := BasicMessage{
+				BasicMessageData: baseMsg.BasicMessageData,
+			}
+
+			peer := gotdMsg.GetPeerID().(*gotdTg.PeerUser)
+
+			for _, gotdUser := range e.Users {
+				if gotdUser.ID == peer.UserID {
+					msg.BasicMessageData.Peer = UserFromGotdUser(gotdUser)
 				}
+			}
 
-				from, ok := gotdMsg.GetFromID()
+			return msg, nil
+		}
 
-				if ok {
-					switch from := from.(type) {
-					case *gotdTg.PeerUser:
-						for _, gotdUser := range e.Users {
-							if gotdUser.ID == from.UserID {
-								msg.FromPeer = &tg.UserPeer{
-									User: *UserFromGotdUser(gotdUser),
-								}
-							}
-						}
-					default:
-						_, _ = fmt.Fprintf(os.Stderr, "Unknown from type: %T\n", from)
-					}
+		basicGroupMessageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *BasicMessage) (tg.Message, error) {
+			msg := BasicMessage{
+				BasicMessageData: baseMsg.BasicMessageData,
+			}
+
+			peer := gotdMsg.GetPeerID().(*gotdTg.PeerChat)
+
+			for _, chat := range e.Chats {
+				if chat.ID == peer.ChatID {
+					msg.BasicMessageData.Peer = ChatFromGotdChat(chat)
 				}
+			}
+			return msg, nil
+		}
 
-				fwdFrom, ok := gotdMsg.GetFwdFrom()
+		channelMessageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *BasicMessage) (tg.Message, error) {
+			msg := BasicMessage{
+				BasicMessageData: baseMsg.BasicMessageData,
+			}
 
-				if ok {
-					fwdFromID, ok := fwdFrom.GetFromID()
+			peer := gotdMsg.GetPeerID().(*gotdTg.PeerChannel)
 
-					if ok {
-						switch fwdFrom := fwdFromID.(type) {
-						case *gotdTg.PeerUser:
-							for _, gotdUser := range e.Users {
-								if gotdUser.ID == fwdFrom.UserID {
-									msg.FwdFromPeer = &tg.UserPeer{
-										User: *UserFromGotdUser(gotdUser),
-									}
-								}
-							}
-						case *gotdTg.PeerChannel:
-							for _, channel := range e.Channels {
-								if channel.ID == fwdFrom.ChannelID {
-									msg.FwdFromPeer = &tg.ChannelPeer{
-										Channel: *ChannelFromGotdChannel(channel),
-									}
-								}
-							}
-						default:
-							_, _ = fmt.Fprintf(os.Stderr, "Unknown fwd from type: %T\n", fwdFrom)
-						}
-					}
+			for _, channel := range e.Channels {
+				if channel.ID == peer.ChannelID {
+					msg.BasicMessageData.Peer = ChannelFromGotdChannel(channel)
 				}
+			}
+			return msg, nil
+		}
 
-				switch peer := gotdMsg.PeerID.(type) {
+		supergroupGroupMessageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *BasicMessage) (tg.Message, error) {
+			msg := BasicMessage{
+				BasicMessageData: baseMsg.BasicMessageData,
+			}
+
+			peer := gotdMsg.GetPeerID().(*gotdTg.PeerChannel)
+
+			for _, channel := range e.Channels {
+				if channel.ID == peer.ChannelID {
+					msg.BasicMessageData.Peer = ChatFromGotdChannel(channel)
+				}
+			}
+			return msg, nil
+		}
+
+		messageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message) (tg.Message, error) {
+			msgBase := BasicMessage{
+				BasicMessageData: BasicMessageData{
+					ID:         int64(gotdMsg.ID),
+					Content:    gotdMsg.Message,
+					IsOutgoing: gotdMsg.Out,
+				},
+			}
+
+			from, ok := gotdMsg.GetFromID()
+
+			if ok {
+				switch from := from.(type) {
 				case *gotdTg.PeerUser:
 					for _, gotdUser := range e.Users {
-						if gotdUser.ID == peer.UserID {
-							msg.ChatMessageData.Peer = &tg.UserPeer{
-								User: *UserFromGotdUser(gotdUser),
-							}
-						}
-					}
-				case *gotdTg.PeerChat:
-					for _, chat := range e.Chats {
-						if chat.ID == peer.ChatID {
-							msg.ChatMessageData.Peer = &tg.ChatPeer{
-								Chat: *ChatFromGotdChat(chat),
-							}
-						}
-					}
-				case *gotdTg.PeerChannel:
-					for _, channel := range e.Channels {
-						if channel.ID == peer.ChannelID {
-							msg.ChatMessageData.Peer = &tg.ChannelPeer{
-								Channel: *ChannelFromGotdChannel(channel),
-							}
+						if gotdUser.ID == from.UserID {
+							msgBase.FromPeer = UserFromGotdUser(gotdUser)
 						}
 					}
 				default:
-					_, _ = fmt.Fprintf(os.Stderr, "Unknown peer type: %T\n", peer)
+					_, _ = fmt.Fprintf(os.Stderr, "Unknown from type: %T\n", from)
 				}
-
-				t.handlers.NewMessage(ctx, &msg)
 			}
 
-			return nil
+			fwdFrom, ok := gotdMsg.GetFwdFrom()
+
+			if ok {
+				fwdFromID, ok := fwdFrom.GetFromID()
+
+				if ok {
+					switch fwdFrom := fwdFromID.(type) {
+					case *gotdTg.PeerUser:
+						for _, gotdUser := range e.Users {
+							if gotdUser.ID == fwdFrom.UserID {
+								msgBase.FwdFromPeer = UserFromGotdUser(gotdUser)
+							}
+						}
+					case *gotdTg.PeerChannel:
+						for _, channel := range e.Channels {
+							if channel.ID == fwdFrom.ChannelID {
+								msgBase.FwdFromPeer = ChannelFromGotdChannel(channel)
+							}
+						}
+					default:
+						_, _ = fmt.Fprintf(os.Stderr, "Unknown fwd from type: %T\n", fwdFrom)
+					}
+				}
+			}
+
+			peer := gotdMsg.GetPeerID()
+
+			if peer == nil {
+				return nil, errors.New("peer is nil")
+			}
+
+			switch peer := peer.(type) {
+			case *gotdTg.PeerUser:
+				return dialogMessageProcessor(ctx, e, gotdMsg, &msgBase)
+			case *gotdTg.PeerChat:
+				return basicGroupMessageProcessor(ctx, e, gotdMsg, &msgBase)
+			case *gotdTg.PeerChannel:
+				for _, channel := range e.Channels {
+					if channel.ID == peer.ChannelID {
+						if channel.Broadcast {
+							return channelMessageProcessor(ctx, e, gotdMsg, &msgBase)
+						} else {
+							return supergroupGroupMessageProcessor(ctx, e, gotdMsg, &msgBase)
+						}
+					}
+				}
+			}
+
+			return nil, errors.New("unknown peer type")
+
 		}
 
 		t.dispatcher.OnNewMessage(func(ctx context.Context, e gotdTg.Entities, u *gotdTg.UpdateNewMessage) error {
-			msg, ok := u.Message.(*gotdTg.Message)
+			gotdMsg, ok := u.Message.(*gotdTg.Message)
 			if !ok {
 				// Ignore service messages.
 				return nil
@@ -274,11 +321,17 @@ func (t *Tg) Start(ctx context.Context) error {
 
 			ctxWithUpdate := context.WithValue(ctx, "gotd_update_context", uc)
 
-			return messageProcessor(ctxWithUpdate, e, msg)
+			msg := utils.PanicOnErrorWrap(messageProcessor(ctxWithUpdate, e, gotdMsg))
+
+			if t.handlers.NewMessage != nil {
+				t.handlers.NewMessage(ctxWithUpdate, msg)
+			}
+
+			return nil
 		})
 
 		t.dispatcher.OnNewChannelMessage(func(ctx context.Context, e gotdTg.Entities, u *gotdTg.UpdateNewChannelMessage) error {
-			msg, ok := u.Message.(*gotdTg.Message)
+			gotdMsg, ok := u.Message.(*gotdTg.Message)
 			if !ok {
 				// Ignore service messages.
 				return nil
@@ -291,7 +344,13 @@ func (t *Tg) Start(ctx context.Context) error {
 
 			ctxWithUpdate := context.WithValue(ctx, "gotd_update_context", uc)
 
-			return messageProcessor(ctxWithUpdate, e, msg)
+			msg := utils.PanicOnErrorWrap(messageProcessor(ctxWithUpdate, e, gotdMsg))
+
+			if t.handlers.NewMessage != nil {
+				t.handlers.NewMessage(ctxWithUpdate, msg)
+			}
+
+			return nil
 		})
 
 		return t.updatesManager.Run(ctx, t.api, self.ID, authOptions)
@@ -327,22 +386,45 @@ func (t *Tg) Reply(ctx context.Context, to tg.Message, content string) error {
 		return errors.New("unexpected message type")
 	}
 
-	notCurrentUpdateMsgErr := errors.New(
-		"Replying not to current update message has not implemented yet",
-	)
+	notCurrentUpdateMsg := false
 
 	if int64(gotdMsg.GetID()) != to.ID() {
-		return notCurrentUpdateMsgErr
+		notCurrentUpdateMsg = true
 	}
 
 	switch p := gotdMsg.PeerID.(type) {
 	case *gotdTg.PeerUser:
 		if p.UserID != to.Where().ID() {
-			return notCurrentUpdateMsgErr
+			notCurrentUpdateMsg = true
 		}
 	case *gotdTg.PeerChat:
 		if p.ChatID != to.Where().ID() {
-			return notCurrentUpdateMsgErr
+			notCurrentUpdateMsg = true
+		}
+	}
+
+	notCurrentUpdateMsg = true
+
+	if notCurrentUpdateMsg {
+		switch to.Where().Type() {
+		case tg.PeerTypeUser:
+			_, err := sender.To(&gotdTg.InputPeerUser{
+				UserID: to.Where().ID(),
+			}).Reply(gotdMsg.GetID()).Text(ctx, content)
+
+			return err
+		case tg.PeerTypeChat:
+			_, err := sender.To(&gotdTg.InputPeerChat{
+				ChatID: to.Where().ID(),
+			}).Reply(gotdMsg.GetID()).Text(ctx, content)
+
+			return err
+		default:
+			x := to.Where()
+			_, _ = fmt.Fprintf(os.Stderr, "Unknown peer type: %T\n", x)
+			return errors.New(
+				"Replying not to current update message has not implemented yet",
+			)
 		}
 	}
 

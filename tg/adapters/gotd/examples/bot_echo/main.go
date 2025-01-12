@@ -42,10 +42,10 @@ func main() {
 		}
 	}
 
-	c.Handlers().Ready = func(ctx context.Context, self tg.User) {
+	c.Handlers().Ready = func(ctx context.Context, self tg.PeerUser) {
 		// TODO: Detect BOT_TOKEN changes and re-authentication requirement.
 
-		fmt.Printf("Started (username: %s)\n", self.Username)
+		fmt.Printf("Started (username: %s)\n", self.Username())
 	}
 
 	c.Handlers().NewMessage = func(ctx context.Context, m tg.Message) {
@@ -69,9 +69,11 @@ func main() {
 
 		fmt.Println(logMsg + ": " + m.Content())
 
-		switch m.Where().(type) {
-		case *tg.UserPeer:
+		switch m.Where().Type() {
+		case tg.PeerTypeUser:
 			utils.PanicOnError(c.Reply(ctx, m, m.Content()))
+			// case *tg.ChannelPeer:
+			// 	utils.PanicOnError(c.Reply(ctx, m, m.Content()))
 		}
 	}
 

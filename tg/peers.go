@@ -2,25 +2,47 @@ package tg
 
 import (
 	"fmt"
-	"github.com/bitia-ru/gotg/utils"
-	"strings"
+)
+
+type PeerType string
+
+const (
+	PeerTypeUser    PeerType = "user"
+	PeerTypeChat    PeerType = "chat"
+	PeerTypeChannel PeerType = "channel"
 )
 
 type Peer interface {
 	ID() int64
 	Name() string
+	Slug() string
+	Type() PeerType
 }
 
-type User struct {
-	ID        int64
-	Username  string
-	Phone     string
-	FirstName string
-	LastName  string
+type PeerUser interface {
+	Peer
+
+	Username() string
+	FirstName() string
+	LastName() string
+	Phone() string
+	Bio() string
 }
 
-func (u *User) String() string {
-	return fmt.Sprintf("<User: %s>", u.Username)
+type PeerChat interface {
+	Peer
+
+	Title() string
+	Description() string
+	MembersCount() int
+}
+
+type PeerChannel interface {
+	Peer
+
+	Title() string
+	Description() string
+	SubscribersCount() int
 }
 
 type Chat struct {
@@ -39,33 +61,6 @@ type Channel struct {
 
 func (c *Channel) String() string {
 	return fmt.Sprintf("<Channel: %s>", c.Title)
-}
-
-type UserPeer struct {
-	User
-}
-
-func (u UserPeer) Name() string {
-	if u.FirstName != "" || u.LastName != "" {
-		return strings.Join(
-			utils.Filter([]string{u.FirstName, u.LastName}, utils.NotEmptyFilter),
-			" ",
-		)
-	}
-
-	if u.Username != "" {
-		return u.Username
-	}
-
-	if u.Phone != "" {
-		return u.Phone
-	}
-
-	return fmt.Sprintf("<User: %d>", u.ID)
-}
-
-func (u UserPeer) ID() int64 {
-	return u.User.ID
 }
 
 type ChatPeer struct {
