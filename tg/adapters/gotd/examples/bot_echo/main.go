@@ -71,9 +71,13 @@ func main() {
 
 		switch m.Where().Type() {
 		case tg.PeerTypeUser:
-			utils.PanicOnError(c.Reply(ctx, m, m.Content()))
-			// case *tg.ChannelPeer:
-			// 	utils.PanicOnError(c.Reply(ctx, m, m.Content()))
+			utils.PanicOnError(
+				m.(tg.DialogMessage).Reply(ctx, m.Content()),
+			)
+		case tg.PeerTypeChat:
+			utils.PanicOnError(
+				m.(tg.ChatMessage).Reply(ctx, m.Content()),
+			)
 		}
 	}
 

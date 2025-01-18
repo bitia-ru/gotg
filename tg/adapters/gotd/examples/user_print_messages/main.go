@@ -55,12 +55,12 @@ func main() {
 		}
 	}
 
-	c.Handlers().Ready = func(ctx context.Context, self tg.User) {
-		if !strings.Contains(phone, self.Phone) {
+	c.Handlers().Ready = func(ctx context.Context, self tg.PeerUser) {
+		if !strings.Contains(phone, self.Phone()) {
 			panic(
 				fmt.Errorf(
 					"phone from env: %s, phone from auth data: %s (session reset required possibly)",
-					self.Phone,
+					self.Phone(),
 					phone,
 				),
 			)
@@ -68,13 +68,17 @@ func main() {
 
 		fmt.Printf(
 			"Started (phone: %s username: %s first name: %s)\n",
-			self.Phone,
-			self.Username,
-			self.FirstName,
+			self.Phone(),
+			self.Username(),
+			self.FirstName(),
 		)
 	}
 
-	c.Handlers().NewMessage = func(m tg.Message) {
+	c.Handlers().NewMessage = func(ctx context.Context, m tg.Message) {
+		if m.IsOutgoing() {
+			return
+		}
+
 		logMsg := "Message"
 
 		if m.Sender() != nil {

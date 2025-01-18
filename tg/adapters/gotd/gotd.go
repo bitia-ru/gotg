@@ -150,7 +150,9 @@ func (t *Tg) AuthenticateAsBot(ctx context.Context, token string) error {
 }
 
 func (t *Tg) Start(ctx context.Context) error {
-	if err := t.client.Run(ctx, func(ctx context.Context) error {
+	ctxWithApi := context.WithValue(ctx, "gotd_api", t.api)
+
+	if err := t.client.Run(ctxWithApi, func(ctx context.Context) error {
 		if t.handlers.Start != nil {
 			t.handlers.Start(ctx)
 		}
@@ -170,89 +172,84 @@ func (t *Tg) Start(ctx context.Context) error {
 			}
 		}
 
-		dialogMessageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *BasicMessage) (tg.Message, error) {
-			msg := BasicMessage{
-				BasicMessageData: baseMsg.BasicMessageData,
+		dialogMessageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
+			msg := MessageDialog{
+				Message: Message{
+					MessageData: baseMsg.MessageData,
+				},
 			}
 
 			peer := gotdMsg.GetPeerID().(*gotdTg.PeerUser)
 
 			for _, gotdUser := range e.Users {
 				if gotdUser.ID == peer.UserID {
-					msg.BasicMessageData.Peer = UserFromGotdUser(gotdUser)
+					msg.MessageData.Peer = UserFromGotdUser(gotdUser)
 				}
 			}
 
 			return msg, nil
 		}
 
-		basicGroupMessageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *BasicMessage) (tg.Message, error) {
-			msg := BasicMessage{
-				BasicMessageData: baseMsg.BasicMessageData,
+		basicGroupMessageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
+			msg := MessageChat{
+				Message: Message{
+					MessageData: baseMsg.MessageData,
+				},
 			}
 
 			peer := gotdMsg.GetPeerID().(*gotdTg.PeerChat)
 
 			for _, chat := range e.Chats {
 				if chat.ID == peer.ChatID {
-					msg.BasicMessageData.Peer = ChatFromGotdChat(chat)
+					msg.MessageData.Peer = ChatFromGotdChat(chat)
 				}
 			}
 			return msg, nil
 		}
 
-		channelMessageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *BasicMessage) (tg.Message, error) {
-			msg := BasicMessage{
-				BasicMessageData: baseMsg.BasicMessageData,
+		channelMessageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
+			msg := Message{
+				MessageData: baseMsg.MessageData,
 			}
 
 			peer := gotdMsg.GetPeerID().(*gotdTg.PeerChannel)
 
 			for _, channel := range e.Channels {
 				if channel.ID == peer.ChannelID {
-					msg.BasicMessageData.Peer = ChannelFromGotdChannel(channel)
+					msg.MessageData.Peer = ChannelFromGotdChannel(channel)
 				}
 			}
 			return msg, nil
 		}
 
-		supergroupGroupMessageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *BasicMessage) (tg.Message, error) {
-			msg := BasicMessage{
-				BasicMessageData: baseMsg.BasicMessageData,
+		supergroupGroupMessageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
+			msg := MessageChat{
+				Message: Message{
+					MessageData: baseMsg.MessageData,
+				},
 			}
 
 			peer := gotdMsg.GetPeerID().(*gotdTg.PeerChannel)
 
 			for _, channel := range e.Channels {
 				if channel.ID == peer.ChannelID {
-					msg.BasicMessageData.Peer = ChatFromGotdChannel(channel)
+					msg.MessageData.Peer = ChatFromGotdChannel(channel)
 				}
 			}
 			return msg, nil
 		}
 
 		messageProcessor := func(ctx context.Context, e gotdTg.Entities, gotdMsg *gotdTg.Message) (tg.Message, error) {
-			msgBase := BasicMessage{
-				BasicMessageData: BasicMessageData{
-					ID:         int64(gotdMsg.ID),
-					Content:    gotdMsg.Message,
-					IsOutgoing: gotdMsg.Out,
+			msgBase := Message{
+				MessageData: MessageData{
+					msg: gotdMsg,
 				},
 			}
 
 			from, ok := gotdMsg.GetFromID()
 
 			if ok {
-				switch from := from.(type) {
-				case *gotdTg.PeerUser:
-					for _, gotdUser := range e.Users {
-						if gotdUser.ID == from.UserID {
-							msgBase.FromPeer = UserFromGotdUser(gotdUser)
-						}
-					}
-				default:
-					_, _ = fmt.Fprintf(os.Stderr, "Unknown from type: %T\n", from)
-				}
+				msgBase.FromPeer = peerFromGotdPeer(from, e)
 			}
 
 			fwdFrom, ok := gotdMsg.GetFwdFrom()
@@ -261,22 +258,7 @@ func (t *Tg) Start(ctx context.Context) error {
 				fwdFromID, ok := fwdFrom.GetFromID()
 
 				if ok {
-					switch fwdFrom := fwdFromID.(type) {
-					case *gotdTg.PeerUser:
-						for _, gotdUser := range e.Users {
-							if gotdUser.ID == fwdFrom.UserID {
-								msgBase.FwdFromPeer = UserFromGotdUser(gotdUser)
-							}
-						}
-					case *gotdTg.PeerChannel:
-						for _, channel := range e.Channels {
-							if channel.ID == fwdFrom.ChannelID {
-								msgBase.FwdFromPeer = ChannelFromGotdChannel(channel)
-							}
-						}
-					default:
-						_, _ = fmt.Fprintf(os.Stderr, "Unknown fwd from type: %T\n", fwdFrom)
-					}
+					msgBase.FwdFromPeer = peerFromGotdPeer(fwdFromID, e)
 				}
 			}
 
@@ -403,8 +385,6 @@ func (t *Tg) Reply(ctx context.Context, to tg.Message, content string) error {
 		}
 	}
 
-	notCurrentUpdateMsg = true
-
 	if notCurrentUpdateMsg {
 		switch to.Where().Type() {
 		case tg.PeerTypeUser:
@@ -414,11 +394,24 @@ func (t *Tg) Reply(ctx context.Context, to tg.Message, content string) error {
 
 			return err
 		case tg.PeerTypeChat:
-			_, err := sender.To(&gotdTg.InputPeerChat{
-				ChatID: to.Where().ID(),
-			}).Reply(gotdMsg.GetID()).Text(ctx, content)
+			if to.Where().(Chat).Chat != nil {
+				_, err := sender.To(&gotdTg.InputPeerChat{
+					ChatID: to.Where().ID(),
+				}).Reply(gotdMsg.GetID()).Text(ctx, content)
 
-			return err
+				return err
+			}
+
+			if to.Where().(Chat).Channel != nil {
+				_, err := sender.To(&gotdTg.InputPeerChannel{
+					ChannelID:  to.Where().ID(),
+					AccessHash: to.Where().(Chat).AccessHash,
+				}).Reply(gotdMsg.GetID()).Text(ctx, content)
+
+				return err
+			}
+
+			return errors.Errorf("Unknown chat type: %T", to.Where())
 		default:
 			x := to.Where()
 			_, _ = fmt.Fprintf(os.Stderr, "Unknown peer type: %T\n", x)

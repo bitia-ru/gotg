@@ -54,10 +54,23 @@ func (c Chat) Type() tg.PeerType {
 	}
 
 	if c.Channel != nil {
-		return tg.PeerTypeChannel
+		if c.Channel.Megagroup {
+			return tg.PeerTypeChat
+		}
+		if c.Channel.Broadcast {
+			return tg.PeerTypeChannel
+		}
 	}
 
 	return ""
+}
+
+func (c Chat) isGotdChat() bool {
+	return c.Chat != nil
+}
+
+func (c Chat) isGotdChannel() bool {
+	return c.Channel != nil
 }
 
 func ChatFromGotdChat(chat *gotdTg.Chat) Chat {

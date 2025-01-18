@@ -2,34 +2,34 @@ package gotd
 
 import (
 	"github.com/bitia-ru/gotg/tg"
+	gotdTg "github.com/gotd/td/tg"
 )
 
-type BasicMessageData struct {
-	ID          int64
+type MessageData struct {
+	msg *gotdTg.Message
+
 	Peer        tg.Peer
 	FromPeer    tg.Peer
 	FwdFromPeer tg.Peer
-	Content     string
-	IsOutgoing  bool
 }
 
-type BasicMessage struct {
-	BasicMessageData
+type Message struct {
+	MessageData
 }
 
-func (c BasicMessage) ID() int64 {
-	return c.BasicMessageData.ID
+func (c Message) ID() int64 {
+	return int64(c.msg.ID)
 }
 
-func (c BasicMessage) Where() tg.Peer {
-	return c.BasicMessageData.Peer
+func (c Message) Where() tg.Peer {
+	return c.MessageData.Peer
 }
 
-func (c BasicMessage) Sender() tg.Peer {
+func (c Message) Sender() tg.Peer {
 	return c.FromPeer
 }
 
-func (c BasicMessage) Author() tg.Peer {
+func (c Message) Author() tg.Peer {
 	if c.IsForwarded() {
 		return c.FwdFromPeer
 	}
@@ -37,38 +37,14 @@ func (c BasicMessage) Author() tg.Peer {
 	return c.FromPeer
 }
 
-func (c BasicMessage) Content() string {
-	return c.BasicMessageData.Content
+func (c Message) Content() string {
+	return c.msg.Message
 }
 
-func (c BasicMessage) IsForwarded() bool {
+func (c Message) IsForwarded() bool {
 	return c.FwdFromPeer != nil
 }
 
-func (c BasicMessage) IsOutgoing() bool {
-	return c.BasicMessageData.IsOutgoing
-}
-
-type DialogMessage = BasicMessage
-type BasicGroupMessage = BasicMessage
-
-const (
-	ChannelTypeChannel = "channel"
-	ChannelTypeGroup   = "group"
-)
-
-type ChannelType string
-
-type ChannelMessage struct {
-	BasicMessageData
-
-	ChannelType ChannelType
-}
-
-func (c ChannelMessage) IsGroup() bool {
-	return c.ChannelType == ChannelTypeGroup
-}
-
-func (c ChannelMessage) IsChannel() bool {
-	return c.ChannelType == ChannelTypeChannel
+func (c Message) IsOutgoing() bool {
+	return c.msg.Out
 }
