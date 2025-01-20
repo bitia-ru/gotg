@@ -2,6 +2,7 @@ package gotd
 
 import (
 	"context"
+	"github.com/bitia-ru/gotg/tg"
 	"github.com/go-faster/errors"
 	"github.com/gotd/td/telegram/message"
 	gotdTg "github.com/gotd/td/tg"
@@ -68,4 +69,16 @@ func (md MessageDialog) Reply(ctx context.Context, content string) error {
 	}
 
 	return nil
+}
+
+func (md MessageDialog) Sender() tg.Peer {
+	return md.Peer
+}
+
+func (md MessageDialog) Author() tg.Peer {
+	if md.IsForwarded() {
+		return md.FwdFromPeer
+	}
+
+	return md.Peer
 }
