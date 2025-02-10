@@ -29,4 +29,6 @@ type Tg interface {
 	Handlers() *Handlers
 
 	Reply(ctx context.Context, to Message, content string) error
+
+	//MessageHistory(ctx context.Context, peer Peer, offset int64, limit int64) ([]Message, error)
 }

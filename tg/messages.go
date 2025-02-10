@@ -22,6 +22,7 @@ type ChatMessage interface {
 	Message
 
 	Reply(ctx context.Context, content string) error
+	RelativeHistory(ctx context.Context, offset int64, limit int64) ([]ChatMessage, error)
 }
 
 type ChannelMessage interface {

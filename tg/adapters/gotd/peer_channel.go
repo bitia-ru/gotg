@@ -26,6 +26,10 @@ func (c Channel) Type() tg.PeerType {
 	return tg.PeerTypeChannel
 }
 
+func (c Channel) accessHash() int64 {
+	return c.Channel.AccessHash
+}
+
 func ChannelFromGotdChannel(channel *gotdTg.Channel) Channel {
 	return Channel{Channel: channel}
 }

@@ -73,6 +73,14 @@ func (c Chat) isGotdChannel() bool {
 	return c.Channel != nil
 }
 
+func (c Chat) accessHash() int64 {
+	if c.isGotdChannel() {
+		return c.Channel.AccessHash
+	}
+
+	return 0
+}
+
 func ChatFromGotdChat(chat *gotdTg.Chat) Chat {
 	return Chat{Chat: chat}
 }

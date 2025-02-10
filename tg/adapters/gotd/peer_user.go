@@ -68,6 +68,15 @@ func (u User) Bio() string {
 	return u.UserFull.About
 }
 
+func (u User) accessHash() int64 {
+	if u.User.AccessHash == 0 {
+		// TODO: obtain access hash
+		panic("no access hash in User")
+	}
+
+	return u.User.AccessHash
+}
+
 func UserFromGotdUser(u *gotdTg.User) User {
 	return User{User: u}
 }
