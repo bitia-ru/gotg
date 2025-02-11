@@ -13,13 +13,13 @@ type MessageDialog struct {
 }
 
 func (md MessageDialog) Reply(ctx context.Context, content string) error {
-	api, ok := ctx.Value("gotd_api").(*gotdTg.Client)
+	t, ok := ctx.Value("gotd").(Tg)
 
 	if !ok {
 		return errors.New("gotd api not found")
 	}
 
-	sender := message.NewSender(api)
+	sender := message.NewSender(t.api)
 
 	gotdUpdateContext, ok := ctx.Value("gotd_update_context").(updateContext)
 

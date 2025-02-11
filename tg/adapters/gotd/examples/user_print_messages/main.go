@@ -23,7 +23,7 @@ func main() {
 		panic("TG_APP_HASH is required")
 	}
 
-	var c tg.Tg = gotd.NewTgClient(appId, os.Getenv("TG_APP_HASH"))
+	var c tg.Tg = gotd.NewTgClient(ctx, appId, os.Getenv("TG_APP_HASH"))
 
 	c.Handlers().CodeRequest = func() string {
 		fmt.Print("Enter code: ")

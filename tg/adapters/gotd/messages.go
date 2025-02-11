@@ -50,7 +50,7 @@ func (c Message) IsOutgoing() bool {
 	return c.msg.Out
 }
 
-func dialogMessageProcessor(e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
+func dialogMessageProcessor(t *Tg, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
 	msg := MessageDialog{
 		Message: Message{
 			MessageData: baseMsg.MessageData,
@@ -61,7 +61,7 @@ func dialogMessageProcessor(e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg 
 
 	for _, gotdUser := range e.Users {
 		if gotdUser.ID == peer.UserID {
-			msg.MessageData.Peer = UserFromGotdUser(gotdUser)
+			msg.MessageData.Peer = t.userFromGotdUser(gotdUser)
 		}
 	}
 

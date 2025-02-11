@@ -13,13 +13,13 @@ type ChatMessage struct {
 }
 
 func (mc ChatMessage) Reply(ctx context.Context, content string) error {
-	api, ok := ctx.Value("gotd_api").(*gotdTg.Client)
+	t, ok := ctx.Value("gotd").(Tg)
 
 	if !ok {
 		return errors.New("gotd api not found")
 	}
 
-	sender := message.NewSender(api)
+	sender := message.NewSender(t.api)
 
 	gotdUpdateContext, ok := ctx.Value("gotd_update_context").(updateContext)
 
@@ -85,7 +85,7 @@ func (mc ChatMessage) Reply(ctx context.Context, content string) error {
 }
 
 func (mc ChatMessage) RelativeHistory(ctx context.Context, offset int64, limit int64) ([]tg.ChatMessage, error) {
-	api, ok := ctx.Value("gotd_api").(*gotdTg.Client)
+	t, ok := ctx.Value("gotd").(Tg)
 
 	if !ok {
 		return nil, errors.New("gotd api not found")
@@ -110,7 +110,7 @@ func (mc ChatMessage) RelativeHistory(ctx context.Context, offset int64, limit i
 		}
 	}
 
-	result, err := api.MessagesGetHistory(ctx, &gotdTg.MessagesGetHistoryRequest{
+	result, err := t.api.MessagesGetHistory(ctx, &gotdTg.MessagesGetHistoryRequest{
 		Peer:      inputPeer,
 		Limit:     int(limit),
 		OffsetID:  int(mc.ID()),
@@ -125,35 +125,6 @@ func (mc ChatMessage) RelativeHistory(ctx context.Context, offset int64, limit i
 
 	messages := result.(gotdTg.ModifiedMessagesMessages)
 
-	users := make(map[int64]*gotdTg.User)
-	chats := make(map[int64]*gotdTg.Chat)
-	channels := make(map[int64]*gotdTg.Channel)
-
-	for _, user := range messages.GetUsers() {
-		notEmptyUser, ok := user.AsNotEmpty()
-
-		if !ok {
-			continue
-		}
-
-		users[notEmptyUser.ID] = notEmptyUser
-	}
-
-	for _, chatOrChannel := range messages.GetChats() {
-		chat, ok := chatOrChannel.(*gotdTg.Chat)
-
-		if ok {
-			chats[chat.ID] = chat
-			continue
-		}
-
-		channel, ok := chatOrChannel.(*gotdTg.Channel)
-
-		if ok {
-			channels[channel.ID] = channel
-		}
-	}
-
 	for _, message := range messages.GetMessages() {
 		msg, ok := message.(*gotdTg.Message)
 
@@ -161,7 +132,7 @@ func (mc ChatMessage) RelativeHistory(ctx context.Context, offset int64, limit i
 			continue
 		}
 
-		gotgMessage, err := chatMessageFromGotdMessage(msg, users, chats, channels)
+		gotgMessage, err := t.chatMessageFromGotdMessage(msg)
 
 		if err != nil {
 			return nil, errors.Wrap(err, "error converting message")
@@ -173,7 +144,7 @@ func (mc ChatMessage) RelativeHistory(ctx context.Context, offset int64, limit i
 	return resultMessages, nil
 }
 
-func chatMessageFromGotdMessage(gotdMsg *gotdTg.Message, users map[int64]*gotdTg.User, chats map[int64]*gotdTg.Chat, channels map[int64]*gotdTg.Channel) (*ChatMessage, error) {
+func (t *Tg) chatMessageFromGotdMessage(gotdMsg *gotdTg.Message) (*ChatMessage, error) {
 	msg := ChatMessage{
 		Message: Message{
 			MessageData: MessageData{
@@ -185,7 +156,7 @@ func chatMessageFromGotdMessage(gotdMsg *gotdTg.Message, users map[int64]*gotdTg
 	from, ok := gotdMsg.GetFromID()
 
 	if ok {
-		msg.FromPeer = peerFromGotdPeer(from, users, chats, channels)
+		msg.FromPeer = t.peerFromGotdPeer(from)
 	}
 
 	fwdFrom, ok := gotdMsg.GetFwdFrom()
@@ -194,7 +165,7 @@ func chatMessageFromGotdMessage(gotdMsg *gotdTg.Message, users map[int64]*gotdTg
 		fwdFromID, ok := fwdFrom.GetFromID()
 
 		if ok {
-			msg.FwdFromPeer = peerFromGotdPeer(fwdFromID, users, chats, channels)
+			msg.FwdFromPeer = t.peerFromGotdPeer(fwdFromID)
 		}
 	}
 
@@ -208,21 +179,15 @@ func chatMessageFromGotdMessage(gotdMsg *gotdTg.Message, users map[int64]*gotdTg
 	case *gotdTg.PeerUser:
 		return nil, errors.New("unexpected peer type")
 	case *gotdTg.PeerChat:
-		chat, ok := chats[peer.ChatID]
-
-		if ok {
-			msg.MessageData.Peer = ChatFromGotdChat(chat)
-		}
+		msg.MessageData.Peer = t.chatFromGotdChat(t.store.Chats[peer.ChatID])
 	case *gotdTg.PeerChannel:
-		channel, ok := channels[peer.ChannelID]
+		channel := t.store.Channels[peer.ChannelID]
 
-		if ok {
-			if channel.Broadcast {
-				return nil, errors.New("unexpected peer type")
-			}
-
-			msg.MessageData.Peer = ChatFromGotdChannel(channel)
+		if channel.Broadcast {
+			return nil, errors.New("unexpected peer type")
 		}
+
+		msg.MessageData.Peer = t.chatFromGotdChannel(channel)
 	}
 
 	return &msg, nil
