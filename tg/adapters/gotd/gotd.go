@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/bitia-ru/gotg/tg"
-	"github.com/bitia-ru/gotg/utils"
 	pebbledb "github.com/cockroachdb/pebble"
 	"github.com/go-faster/errors"
 	"github.com/gotd/contrib/bbolt"
@@ -24,26 +23,13 @@ import (
 	"time"
 )
 
-type GotdTgStore struct {
-	Chats    map[int64]*gotdTg.Chat
-	Users    map[int64]*gotdTg.User
-	Channels map[int64]*gotdTg.Channel
-}
-
-func NewGotdTgStore() *GotdTgStore {
-	return &GotdTgStore{
-		Chats:    make(map[int64]*gotdTg.Chat),
-		Users:    make(map[int64]*gotdTg.User),
-		Channels: make(map[int64]*gotdTg.Channel),
-	}
-}
-
 type Tg struct {
 	context context.Context
 
 	handlers tg.Handlers
 
-	store *GotdTgStore
+	store  *GotdTgStore
+	peerDB *pebble.PeerStorage
 
 	sessionStorage *telegram.FileSessionStorage
 	updatesManager *gotdUpdates.Manager
@@ -114,6 +100,7 @@ func NewTgClient(context context.Context, appID int, appHash string) tg.Tg {
 	return &Tg{
 		context:        context,
 		store:          NewGotdTgStore(),
+		peerDB:         peerDB,
 		sessionStorage: sessionStorage,
 		updatesManager: updatesManager,
 		client:         client,
@@ -192,182 +179,26 @@ func (t *Tg) Start(ctx context.Context) error {
 			}
 		}
 
-		dialogMessageProcessor := func(ctx context.Context, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
-			msg := MessageDialog{
-				Message: Message{
-					MessageData: baseMsg.MessageData,
-				},
-			}
+		t.dispatcher.OnNewMessage(func(ctx context.Context, e gotdTg.Entities, update *gotdTg.UpdateNewMessage) error {
+			gotdMsg, ok := update.Message.(*gotdTg.Message)
 
-			peer := gotdMsg.GetPeerID().(*gotdTg.PeerUser)
-
-			user, err := t.fetchUserById(peer.UserID)
-
-			if err != nil {
-				return nil, errors.Wrap(err, "fetch user")
-			}
-
-			msg.MessageData.Peer = t.userFromGotdUser(user)
-
-			return msg, nil
-		}
-
-		basicGroupMessageProcessor := func(ctx context.Context, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
-			msg := ChatMessage{
-				Message: Message{
-					MessageData: baseMsg.MessageData,
-				},
-			}
-
-			peer := gotdMsg.GetPeerID().(*gotdTg.PeerChat)
-
-			msg.MessageData.Peer = t.chatFromGotdChat(t.store.Chats[peer.ChatID])
-
-			return msg, nil
-		}
-
-		channelMessageProcessor := func(ctx context.Context, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
-			msg := Message{
-				MessageData: baseMsg.MessageData,
-			}
-
-			peer := gotdMsg.GetPeerID().(*gotdTg.PeerChannel)
-
-			msg.MessageData.Peer = t.channelFromGotdChannel(t.store.Channels[peer.ChannelID])
-
-			return msg, nil
-		}
-
-		supergroupGroupMessageProcessor := func(ctx context.Context, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
-			msg := ChatMessage{
-				Message: Message{
-					MessageData: baseMsg.MessageData,
-				},
-			}
-
-			peer := gotdMsg.GetPeerID().(*gotdTg.PeerChannel)
-
-			msg.MessageData.Peer = t.chatFromGotdChannel(t.store.Channels[peer.ChannelID])
-
-			return msg, nil
-		}
-
-		messageProcessor := func(ctx context.Context, gotdMsg *gotdTg.Message) (tg.Message, error) {
-			msgBase := Message{
-				MessageData: MessageData{
-					msg: gotdMsg,
-				},
-			}
-
-			from, ok := gotdMsg.GetFromID()
-
-			if ok {
-				msgBase.FromPeer = t.peerFromGotdPeer(from)
-			}
-
-			fwdFrom, ok := gotdMsg.GetFwdFrom()
-
-			if ok {
-				fwdFromID, ok := fwdFrom.GetFromID()
-
-				if ok {
-					msgBase.FwdFromPeer = t.peerFromGotdPeer(fwdFromID)
-				}
-			}
-
-			peer := gotdMsg.GetPeerID()
-
-			if peer == nil {
-				return nil, errors.New("peer is nil")
-			}
-
-			switch peer := peer.(type) {
-			case *gotdTg.PeerUser:
-				return dialogMessageProcessor(ctx, gotdMsg, &msgBase)
-			case *gotdTg.PeerChat:
-				return basicGroupMessageProcessor(ctx, gotdMsg, &msgBase)
-			case *gotdTg.PeerChannel:
-				channel := t.store.Channels[peer.ChannelID]
-
-				if channel.Broadcast {
-					return channelMessageProcessor(ctx, gotdMsg, &msgBase)
-				} else {
-					return supergroupGroupMessageProcessor(ctx, gotdMsg, &msgBase)
-				}
-			}
-
-			return nil, errors.New("unknown peer type")
-
-		}
-
-		t.dispatcher.OnNewMessage(func(ctx context.Context, e gotdTg.Entities, u *gotdTg.UpdateNewMessage) error {
-			gotdMsg, ok := u.Message.(*gotdTg.Message)
 			if !ok {
 				// Ignore service messages.
 				return nil
 			}
 
-			uc := updateContext{
-				entities: e,
-				update:   u,
-			}
-
-			ctxWithUpdate := context.WithValue(ctx, "gotd_update_context", uc)
-
-			for _, user := range e.Users {
-				t.store.Users[user.ID] = user
-			}
-
-			for _, chat := range e.Chats {
-				t.store.Chats[chat.ID] = chat
-			}
-
-			for _, channel := range e.Channels {
-				t.store.Channels[channel.ID] = channel
-			}
-
-			msg := utils.PanicOnErrorWrap(messageProcessor(ctxWithUpdate, gotdMsg))
-
-			if t.handlers.NewMessage != nil {
-				t.handlers.NewMessage(ctxWithUpdate, msg)
-			}
-
-			return nil
+			return NewMessageDispatcher(ctx, t, gotdMsg)
 		})
 
-		t.dispatcher.OnNewChannelMessage(func(ctx context.Context, e gotdTg.Entities, u *gotdTg.UpdateNewChannelMessage) error {
-			gotdMsg, ok := u.Message.(*gotdTg.Message)
+		t.dispatcher.OnNewChannelMessage(func(ctx context.Context, e gotdTg.Entities, update *gotdTg.UpdateNewChannelMessage) error {
+			gotdMsg, ok := update.Message.(*gotdTg.Message)
+
 			if !ok {
 				// Ignore service messages.
 				return nil
 			}
 
-			uc := updateContext{
-				entities: e,
-				update:   u,
-			}
-
-			ctxWithUpdate := context.WithValue(ctx, "gotd_update_context", uc)
-
-			for _, user := range e.Users {
-				t.store.Users[user.ID] = user
-			}
-
-			for _, chat := range e.Chats {
-				t.store.Chats[chat.ID] = chat
-			}
-
-			for _, channel := range e.Channels {
-				t.store.Channels[channel.ID] = channel
-			}
-
-			msg := utils.PanicOnErrorWrap(messageProcessor(ctxWithUpdate, gotdMsg))
-
-			if t.handlers.NewMessage != nil {
-				t.handlers.NewMessage(ctxWithUpdate, msg)
-			}
-
-			return nil
+			return NewMessageDispatcher(ctx, t, gotdMsg)
 		})
 
 		return t.updatesManager.Run(ctx, t.api, self.ID, authOptions)
@@ -429,7 +260,7 @@ func (t *Tg) Reply(ctx context.Context, to tg.Message, content string) error {
 
 			return err
 		case tg.PeerTypeChat:
-			if to.Where().(Chat).Chat != nil {
+			if to.Where().(*Chat).Chat != nil {
 				_, err := sender.To(&gotdTg.InputPeerChat{
 					ChatID: to.Where().ID(),
 				}).Reply(gotdMsg.GetID()).Text(ctx, content)
@@ -437,10 +268,10 @@ func (t *Tg) Reply(ctx context.Context, to tg.Message, content string) error {
 				return err
 			}
 
-			if to.Where().(Chat).Channel != nil {
+			if to.Where().(*Chat).Channel != nil {
 				_, err := sender.To(&gotdTg.InputPeerChannel{
 					ChannelID:  to.Where().ID(),
-					AccessHash: to.Where().(Chat).AccessHash,
+					AccessHash: to.Where().(*Chat).AccessHash,
 				}).Reply(gotdMsg.GetID()).Text(ctx, content)
 
 				return err
@@ -469,12 +300,12 @@ func (t *Tg) MessageHistory(ctx context.Context, peer tg.Peer, offset int64, lim
 	var inputPeer gotdTg.InputPeerClass
 
 	switch gotdPeer := peer.(type) {
-	case User:
+	case *User:
 		inputPeer = &gotdTg.InputPeerUser{
 			UserID:     gotdPeer.ID(),
 			AccessHash: gotdPeer.accessHash(),
 		}
-	case Chat:
+	case *Chat:
 		if gotdPeer.isGotdChat() {
 			inputPeer = &gotdTg.InputPeerChat{
 				ChatID: gotdPeer.ID(),
@@ -485,7 +316,7 @@ func (t *Tg) MessageHistory(ctx context.Context, peer tg.Peer, offset int64, lim
 				AccessHash: gotdPeer.accessHash(),
 			}
 		}
-	case Channel:
+	case *Channel:
 		inputPeer = &gotdTg.InputPeerChannel{
 			ChannelID:  gotdPeer.ID(),
 			AccessHash: gotdPeer.accessHash(),
@@ -502,7 +333,7 @@ func (t *Tg) MessageHistory(ctx context.Context, peer tg.Peer, offset int64, lim
 	}
 
 	switch gotdPeer := peer.(type) {
-	case User:
+	case *User:
 		messages := result.(*gotdTg.MessagesMessagesSlice)
 
 		for _, message := range messages.GetMessages() {
@@ -514,7 +345,7 @@ func (t *Tg) MessageHistory(ctx context.Context, peer tg.Peer, offset int64, lim
 
 			fmt.Println(msg.Message)
 		}
-	case Chat:
+	case *Chat:
 		if gotdPeer.isGotdChat() {
 			messages := result.(*gotdTg.MessagesMessagesSlice)
 
@@ -550,7 +381,7 @@ func (t *Tg) MessageHistory(ctx context.Context, peer tg.Peer, offset int64, lim
 				fmt.Println(msg.Message)
 			}
 		}
-	case Channel:
+	case *Channel:
 		messages := result.(*gotdTg.MessagesChannelMessages)
 
 		for _, message := range messages.GetMessages() {

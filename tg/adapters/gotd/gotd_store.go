@@ -5,6 +5,20 @@ import (
 	gotdTg "github.com/gotd/td/tg"
 )
 
+type GotdTgStore struct {
+	Chats    map[int64]*gotdTg.Chat
+	Users    map[int64]*gotdTg.User
+	Channels map[int64]*gotdTg.Channel
+}
+
+func NewGotdTgStore() *GotdTgStore {
+	return &GotdTgStore{
+		Chats:    make(map[int64]*gotdTg.Chat),
+		Users:    make(map[int64]*gotdTg.User),
+		Channels: make(map[int64]*gotdTg.Channel),
+	}
+}
+
 func (t *Tg) MessagesGetHistory(
 	ctx context.Context,
 	request *gotdTg.MessagesGetHistoryRequest,

@@ -1,22 +1,40 @@
 package gotd
 
 import (
-	"fmt"
+	"context"
 	"github.com/bitia-ru/gotg/tg"
+	"github.com/gotd/contrib/storage"
+	"github.com/gotd/td/telegram/query/dialogs"
 	gotdTg "github.com/gotd/td/tg"
-	"os"
 )
 
-func (t *Tg) peerFromGotdPeer(peer gotdTg.PeerClass) tg.Peer {
-	switch gotdPeer := peer.(type) {
+func (t *Tg) peerFromGotdPeer(ctx context.Context, peer gotdTg.PeerClass) tg.Peer {
+	switch peer := peer.(type) {
 	case *gotdTg.PeerUser:
-		if user, err := t.fetchUserById(gotdPeer.UserID); err == nil {
-			return t.userFromGotdUser(user)
+		if peerFromDb, err := t.peerDB.Find(ctx, storage.PeerKey{
+			Kind: dialogs.User,
+			ID:   peer.UserID,
+		}); err == nil {
+			return t.userFromGotdUser(peerFromDb.User)
+		}
+	case *gotdTg.PeerChat:
+		if peerFromDb, err := t.peerDB.Find(ctx, storage.PeerKey{
+			Kind: dialogs.Chat,
+			ID:   peer.ChatID,
+		}); err == nil {
+			return t.chatFromGotdChat(peerFromDb.Chat)
 		}
 	case *gotdTg.PeerChannel:
-		return t.channelFromGotdChannel(t.store.Channels[gotdPeer.ChannelID])
-	default:
-		_, _ = fmt.Fprintf(os.Stderr, "Unknown from type: %T\n", gotdPeer)
+		if peerFromDb, err := t.peerDB.Find(ctx, storage.PeerKey{
+			Kind: dialogs.Channel,
+			ID:   peer.ChannelID,
+		}); err == nil {
+			if peerFromDb.Channel.Broadcast {
+				return t.channelFromGotdChannel(peerFromDb.Channel)
+			} else {
+				return t.chatFromGotdChannel(peerFromDb.Channel)
+			}
+		}
 	}
 
 	return nil

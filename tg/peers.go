@@ -1,6 +1,7 @@
 package tg
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -17,6 +18,8 @@ type Peer interface {
 	Name() string
 	Slug() string
 	Type() PeerType
+
+	SendMessage(ctx context.Context, text string) error
 }
 
 type PeerUser interface {

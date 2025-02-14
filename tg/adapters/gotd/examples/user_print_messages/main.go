@@ -23,7 +23,7 @@ func main() {
 		panic("TG_APP_HASH is required")
 	}
 
-	var c tg.Tg = gotd.NewTgClient(ctx, appId, os.Getenv("TG_APP_HASH"))
+	c := gotd.NewTgClient(ctx, appId, os.Getenv("TG_APP_HASH"))
 
 	c.Handlers().CodeRequest = func() string {
 		fmt.Print("Enter code: ")
@@ -94,6 +94,10 @@ func main() {
 		}
 
 		fmt.Println(logMsg + ": " + m.Content())
+
+		if m.Where().Type() != tg.PeerTypeChannel {
+			m.Reply(ctx, "Got it!")
+		}
 	}
 
 	err := c.Start(ctx)

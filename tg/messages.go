@@ -10,19 +10,17 @@ type Message interface {
 	IsForwarded() bool
 	Content() string
 	IsOutgoing() bool
+
+	Reply(ctx context.Context, content string) error
+	RelativeHistory(ctx context.Context, offset int64, limit int64) ([]Message, error)
 }
 
 type DialogMessage interface {
 	Message
-
-	Reply(ctx context.Context, content string) error
 }
 
 type ChatMessage interface {
 	Message
-
-	Reply(ctx context.Context, content string) error
-	RelativeHistory(ctx context.Context, offset int64, limit int64) ([]ChatMessage, error)
 }
 
 type ChannelMessage interface {

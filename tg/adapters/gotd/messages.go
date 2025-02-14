@@ -1,8 +1,9 @@
 package gotd
 
 import (
+	"context"
 	"github.com/bitia-ru/gotg/tg"
-	//"github.com/go-faster/errors"
+	"github.com/go-faster/errors"
 	gotdTg "github.com/gotd/td/tg"
 )
 
@@ -18,19 +19,19 @@ type Message struct {
 	MessageData
 }
 
-func (c Message) ID() int64 {
+func (c *Message) ID() int64 {
 	return int64(c.msg.ID)
 }
 
-func (c Message) Where() tg.Peer {
+func (c *Message) Where() tg.Peer {
 	return c.MessageData.Peer
 }
 
-func (c Message) Sender() tg.Peer {
+func (c *Message) Sender() tg.Peer {
 	return c.FromPeer
 }
 
-func (c Message) Author() tg.Peer {
+func (c *Message) Author() tg.Peer {
 	if c.IsForwarded() {
 		return c.FwdFromPeer
 	}
@@ -38,86 +39,77 @@ func (c Message) Author() tg.Peer {
 	return c.FromPeer
 }
 
-func (c Message) Content() string {
+func (c *Message) Content() string {
 	return c.msg.Message
 }
 
-func (c Message) IsForwarded() bool {
+func (c *Message) IsForwarded() bool {
 	return c.FwdFromPeer != nil
 }
 
-func (c Message) IsOutgoing() bool {
+func (c *Message) IsOutgoing() bool {
 	return c.msg.Out
 }
 
-func dialogMessageProcessor(t *Tg, e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
-	msg := MessageDialog{
-		Message: Message{
-			MessageData: baseMsg.MessageData,
-		},
+func (m *Message) RelativeHistory(ctx context.Context, offset int64, limit int64) ([]tg.Message, error) {
+	t, ok := ctx.Value("gotd").(*Tg)
+
+	if !ok {
+		return nil, errors.New("gotd api not found")
 	}
 
-	peer := gotdMsg.GetPeerID().(*gotdTg.PeerUser)
+	var inputPeer gotdTg.InputPeerClass
 
-	for _, gotdUser := range e.Users {
-		if gotdUser.ID == peer.UserID {
-			msg.MessageData.Peer = t.userFromGotdUser(gotdUser)
+	switch p := m.Where().(type) {
+	case *User:
+		inputPeer = p.AsInputPeer()
+	case *Chat:
+		if p.isGotdChat() {
+			inputPeer = p.Chat.AsInputPeer()
+		} else {
+			inputPeer = p.Channel.AsInputPeer()
 		}
+	case *Channel:
+		inputPeer = p.Channel.AsInputPeer()
+	default:
+		return nil, errors.Errorf("unknown peer type: %T", m.Where())
 	}
 
-	return msg, nil
+	result, err := t.api.MessagesGetHistory(ctx, &gotdTg.MessagesGetHistoryRequest{
+		Peer:      inputPeer,
+		Limit:     int(limit),
+		OffsetID:  int(m.ID()),
+		AddOffset: int(offset),
+	})
+
+	if err != nil {
+		return nil, errors.Wrap(err, "error fetching message")
+	}
+
+	var resultMessages []tg.Message
+
+	messages := result.(gotdTg.ModifiedMessagesMessages)
+
+	for _, message := range messages.GetMessages() {
+		msg, ok := message.(*gotdTg.Message)
+
+		if !ok {
+			continue
+		}
+
+		gotgMessage, err := t.fromGotdMessage(ctx, msg)
+
+		if err != nil {
+			return nil, errors.Wrap(err, "error converting message")
+		}
+
+		resultMessages = append(resultMessages, gotgMessage)
+	}
+
+	return resultMessages, nil
 }
 
-/*func basicGroupMessageProcessor(e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
-	msg := ChatMessage{
-		Message: Message{
-			MessageData: baseMsg.MessageData,
-		},
-	}
-
-	peer := gotdMsg.GetPeerID().(*gotdTg.PeerChat)
-
-	for _, chat := range e.Chats {
-		if chat.ID == peer.ChatID {
-			msg.MessageData.Peer = ChatFromGotdChat(chat)
-		}
-	}
-	return msg, nil
-}*/
-
-/*func channelMessageProcessor(e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
-	msg := Message{
-		MessageData: baseMsg.MessageData,
-	}
-
-	peer := gotdMsg.GetPeerID().(*gotdTg.PeerChannel)
-
-	for _, channel := range e.Channels {
-		if channel.ID == peer.ChannelID {
-			msg.MessageData.Peer = ChannelFromGotdChannel(channel)
-		}
-	}
-	return msg, nil
-}
-
-func supergroupGroupMessageProcessor(e gotdTg.Entities, gotdMsg *gotdTg.Message, baseMsg *Message) (tg.Message, error) {
-	msg := ChatMessage{
-		Message: Message{
-			MessageData: baseMsg.MessageData,
-		},
-	}
-
-	peer := gotdMsg.GetPeerID().(*gotdTg.PeerChannel)
-
-	for _, channel := range e.Channels {
-		if channel.ID == peer.ChannelID {
-			msg.MessageData.Peer = ChatFromGotdChannel(channel)
-		}
-	}
-	return msg, nil
-}
-
-func messageProcessor(gotdMsg *gotdTg.Message, users []*gotdTg.User, chats []gotdTg.ChatClass) (tg.Message, error) {
+func (t *Tg) fromGotdMessage(ctx context.Context, gotdMsg *gotdTg.Message) (tg.Message, error) {
 	msgBase := Message{
 		MessageData: MessageData{
 			msg: gotdMsg,
@@ -127,17 +119,7 @@ func messageProcessor(gotdMsg *gotdTg.Message, users []*gotdTg.User, chats []got
 	from, ok := gotdMsg.GetFromID()
 
 	if ok {
-		msgBase.FromPeer = peerFromGotdPeer(from, users, chats)
-	}
-
-	fwdFrom, ok := gotdMsg.GetFwdFrom()
-
-	if ok {
-		fwdFromID, ok := fwdFrom.GetFromID()
-
-		if ok {
-			msgBase.FwdFromPeer = peerFromGotdPeer(fwdFromID, e)
-		}
+		msgBase.FromPeer = t.peerFromGotdPeer(ctx, from)
 	}
 
 	peer := gotdMsg.GetPeerID()
@@ -146,26 +128,22 @@ func messageProcessor(gotdMsg *gotdTg.Message, users []*gotdTg.User, chats []got
 		return nil, errors.New("peer is nil")
 	}
 
-	switch peer := peer.(type) {
-	case *gotdTg.PeerUser:
-		return dialogMessageProcessor(e, gotdMsg, &msgBase)
-	case *gotdTg.PeerChat:
-		return basicGroupMessageProcessor(e, gotdMsg, &msgBase)
-	case *gotdTg.PeerChannel:
-		for _, channel := range e.Channels {
-			if channel.ID == peer.ChannelID {
-				if channel.Broadcast {
-					return channelMessageProcessor(e, gotdMsg, &msgBase)
-				} else {
-					return supergroupGroupMessageProcessor(e, gotdMsg, &msgBase)
-				}
-			}
+	msgBase.Peer = t.peerFromGotdPeer(ctx, peer)
+
+	switch msgBase.Peer.(type) {
+	case *User:
+		msgDialog := DialogMessage{
+			Message: msgBase,
 		}
+
+		msgDialog.FromPeer = msgBase.Peer
+
+		return &msgDialog, nil
+	case *Chat:
+		return &ChatMessage{Message: msgBase}, nil
+	case *Channel:
+		return &ChannelMessage{Message: msgBase}, nil
 	}
 
 	return nil, errors.New("unknown peer type")
 }
-
-func fromGotdMessage(msg *gotdTg.Message, users []*gotdTg.User, chats []gotdTg.ChatClass) (tg.Message, error) {
-	return messageProcessor(msg, users, chats)
-}*/

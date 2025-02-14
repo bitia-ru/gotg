@@ -27,7 +27,7 @@ func main() {
 		panic("TG_APP_HASH is required")
 	}
 
-	var c tg.Tg = gotd.NewTgClient(ctx, appId, appHash)
+	c := gotd.NewTgClient(ctx, appId, appHash)
 
 	c.Handlers().CodeRequest = func() string {
 		fmt.Print("Enter code: ")
@@ -69,16 +69,9 @@ func main() {
 
 		fmt.Println(logMsg + ": " + m.Content())
 
-		switch m.Where().Type() {
-		case tg.PeerTypeUser:
-			utils.PanicOnError(
-				m.(tg.DialogMessage).Reply(ctx, m.Content()),
-			)
-		case tg.PeerTypeChat:
-			utils.PanicOnError(
-				m.(tg.ChatMessage).Reply(ctx, m.Content()),
-			)
-		}
+		m.Reply(ctx, m.Content())
+
+		m.Where().SendMessage(ctx, "Hello!")
 	}
 
 	utils.PanicOnError(c.Start(ctx))

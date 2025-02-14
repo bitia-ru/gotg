@@ -1,6 +1,7 @@
 package gotd
 
 import (
+	"context"
 	"fmt"
 	"github.com/bitia-ru/gotg/tg"
 	"github.com/go-faster/errors"
@@ -14,7 +15,7 @@ type Chat struct {
 	*gotdTg.ChannelFull
 }
 
-func (c Chat) ID() int64 {
+func (c *Chat) ID() int64 {
 	if c.Chat != nil {
 		return c.Chat.ID
 	}
@@ -26,7 +27,7 @@ func (c Chat) ID() int64 {
 	return 0
 }
 
-func (c Chat) Name() string {
+func (c *Chat) Name() string {
 	if c.Chat != nil {
 		return c.Chat.Title
 	}
@@ -38,7 +39,7 @@ func (c Chat) Name() string {
 	return ""
 }
 
-func (c Chat) Slug() string {
+func (c *Chat) Slug() string {
 	if c.Chat != nil {
 		return ""
 	}
@@ -50,7 +51,7 @@ func (c Chat) Slug() string {
 	return ""
 }
 
-func (c Chat) Type() tg.PeerType {
+func (c *Chat) Type() tg.PeerType {
 	if c.Chat != nil {
 		return tg.PeerTypeChat
 	}
@@ -67,15 +68,19 @@ func (c Chat) Type() tg.PeerType {
 	return ""
 }
 
-func (c Chat) isGotdChat() bool {
+func (c *Chat) SendMessage(ctx context.Context, content string) error {
+	return nil
+}
+
+func (c *Chat) isGotdChat() bool {
 	return c.Chat != nil
 }
 
-func (c Chat) isGotdChannel() bool {
+func (c *Chat) isGotdChannel() bool {
 	return c.Channel != nil
 }
 
-func (c Chat) accessHash() int64 {
+func (c *Chat) accessHash() int64 {
 	if c.isGotdChannel() {
 		return c.Channel.AccessHash
 	}
@@ -115,10 +120,10 @@ func (t *Tg) fetchSuperGroupById(id int64) (*gotdTg.Channel, error) {
 	return nil, nil
 }
 
-func (t *Tg) chatFromGotdChat(chat *gotdTg.Chat) Chat {
-	return Chat{Chat: chat}
+func (t *Tg) chatFromGotdChat(chat *gotdTg.Chat) *Chat {
+	return &Chat{Chat: chat}
 }
 
-func (t *Tg) chatFromGotdChannel(chat *gotdTg.Channel) Chat {
-	return Chat{Channel: chat}
+func (t *Tg) chatFromGotdChannel(chat *gotdTg.Channel) *Chat {
+	return &Chat{Channel: chat}
 }
