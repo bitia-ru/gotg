@@ -1,6 +1,9 @@
 package tg
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type Message interface {
 	ID() int64
@@ -10,6 +13,8 @@ type Message interface {
 	IsForwarded() bool
 	Content() string
 	IsOutgoing() bool
+	CreatedAt() time.Time
+	ReplyToMsgID() int64
 
 	Reply(ctx context.Context, content string) error
 	RelativeHistory(ctx context.Context, offset int64, limit int64) ([]Message, error)

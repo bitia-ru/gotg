@@ -5,6 +5,7 @@ import (
 	"github.com/bitia-ru/gotg/tg"
 	"github.com/go-faster/errors"
 	gotdTg "github.com/gotd/td/tg"
+	"time"
 )
 
 type MessageData struct {
@@ -13,42 +14,68 @@ type MessageData struct {
 	Peer        tg.Peer
 	FromPeer    tg.Peer
 	FwdFromPeer tg.Peer
+
+	replyToMsgID int64
 }
 
 type Message struct {
 	MessageData
 }
 
-func (c *Message) ID() int64 {
-	return int64(c.msg.ID)
+func (m *Message) ID() int64 {
+	return int64(m.msg.ID)
 }
 
-func (c *Message) Where() tg.Peer {
-	return c.MessageData.Peer
+func (m *Message) Where() tg.Peer {
+	return m.MessageData.Peer
 }
 
-func (c *Message) Sender() tg.Peer {
-	return c.FromPeer
+func (m *Message) Sender() tg.Peer {
+	return m.FromPeer
 }
 
-func (c *Message) Author() tg.Peer {
-	if c.IsForwarded() {
-		return c.FwdFromPeer
+func (m *Message) Author() tg.Peer {
+	if m.IsForwarded() {
+		return m.FwdFromPeer
 	}
 
-	return c.FromPeer
+	return m.FromPeer
 }
 
-func (c *Message) Content() string {
-	return c.msg.Message
+func (m *Message) Content() string {
+	return m.msg.Message
 }
 
-func (c *Message) IsForwarded() bool {
-	return c.FwdFromPeer != nil
+func (m *Message) IsForwarded() bool {
+	return m.FwdFromPeer != nil
 }
 
-func (c *Message) IsOutgoing() bool {
-	return c.msg.Out
+func (m *Message) IsOutgoing() bool {
+	return m.msg.Out
+}
+
+func (m *Message) CreatedAt() time.Time {
+	return time.Unix(int64(m.msg.Date), 0)
+}
+
+func (m *Message) ReplyToMsgID() int64 {
+	if m.replyToMsgID != 0 {
+		return m.replyToMsgID
+	}
+
+	if m.msg.ReplyTo == nil {
+		return 0
+	}
+
+	msgReplyHeader, ok := m.msg.ReplyTo.(*gotdTg.MessageReplyHeader)
+
+	if !ok {
+		return 0
+	}
+
+	m.replyToMsgID = int64(msgReplyHeader.ReplyToMsgID)
+
+	return m.replyToMsgID
 }
 
 func (m *Message) RelativeHistory(ctx context.Context, offset int64, limit int64) ([]tg.Message, error) {
