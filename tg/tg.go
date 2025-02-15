@@ -27,4 +27,6 @@ type Tg interface {
 	Start(ctx context.Context) error
 
 	Handlers() *Handlers
+
+	FindPeerBySlug(ctx context.Context, slug string) (Peer, error)
 }

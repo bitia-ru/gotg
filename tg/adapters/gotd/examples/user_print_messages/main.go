@@ -79,6 +79,15 @@ func main() {
 			return
 		}
 
+		if m.Sender() == nil {
+			fmt.Println("Sender is nil")
+			return
+		}
+
+		if m.Sender().Slug() != "boy_on_the_earth" {
+			return
+		}
+
 		logMsg := "Message"
 
 		if m.Sender() != nil {
@@ -96,7 +105,7 @@ func main() {
 		fmt.Println(logMsg + ": " + m.Content())
 
 		if m.Where().Type() != tg.PeerTypeChannel {
-			m.Reply(ctx, "Got it!")
+			_ = m.Reply(ctx, "Got it!")
 		}
 	}
 

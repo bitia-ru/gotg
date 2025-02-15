@@ -397,3 +397,64 @@ func (t *Tg) MessageHistory(ctx context.Context, peer tg.Peer, offset int64, lim
 
 	return nil, nil
 }
+
+func (t *Tg) FindPeerBySlug(ctx context.Context, slug string) (tg.Peer, error) {
+	i, err := t.peerDB.Iterate(ctx)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "iterate peers")
+	}
+
+	for {
+		p := i.Value()
+
+		if p.User != nil && p.User.Username == slug {
+			return t.userFromGotdUser(p.User), nil
+		}
+
+		if p.Channel != nil && p.Channel.Username == slug {
+			if p.Channel.Broadcast {
+				return t.channelFromGotdChannel(p.Channel), nil
+			} else {
+				return t.chatFromGotdChannel(p.Channel), nil
+			}
+		}
+
+		if !i.Next(ctx) {
+			break
+		}
+	}
+
+	gotdPeer, err := t.api.ContactsResolveUsername(ctx, slug)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(gotdPeer.Users) != 1 && len(gotdPeer.Chats) != 1 {
+		return nil, errors.New("ambiguous result of searching peer by slug")
+	}
+
+	switch gotdPeer.Peer.(type) {
+	case *gotdTg.PeerUser:
+		if err := t.putUserToPeerDb(ctx, gotdPeer.Users[0].(*gotdTg.User)); err != nil {
+			fmt.Println("unexpected error during putting user to peerDB", err.Error())
+		}
+
+		return t.userFromGotdUser(gotdPeer.Users[0].(*gotdTg.User)), nil
+	case *gotdTg.PeerChat:
+		if err := t.putChatToPeerDb(ctx, gotdPeer.Chats[0].(gotdTg.ChatClass)); err != nil {
+			fmt.Println("unexpected error during putting chat to peerDB", err.Error())
+		}
+
+		return t.chatFromGotdChat(gotdPeer.Chats[0].(*gotdTg.Chat)), nil
+	case *gotdTg.PeerChannel:
+		if err := t.putChannelToPeerDb(ctx, gotdPeer.Chats[0].(*gotdTg.Channel)); err != nil {
+			fmt.Println("unexpected error during putting channel to peerDB", err.Error())
+		}
+
+		return t.channelFromGotdChannel(gotdPeer.Chats[0].(*gotdTg.Channel)), nil
+	}
+
+	return nil, errors.New("peer not found")
+}

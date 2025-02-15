@@ -94,40 +94,6 @@ func (u *User) accessHash() int64 {
 	return u.User.AccessHash
 }
 
-func (t *Tg) fetchUserById(id int64) (*gotdTg.User, error) {
-	if user := t.store.Users[id]; user != nil {
-		return user, nil
-	}
-
-	res, err := t.api.UsersGetUsers(t.context, []gotdTg.InputUserClass{
-		&gotdTg.InputUser{
-			UserID: id,
-		},
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	if len(res) == 0 {
-		return nil, fmt.Errorf("user %d not found", id)
-	}
-
-	if len(res) > 1 {
-		return nil, fmt.Errorf("multiple users found for id %d", id)
-	}
-
-	user, ok := res[0].AsNotEmpty()
-
-	if !ok {
-		return nil, fmt.Errorf("user %d not found", id)
-	}
-
-	t.store.Users[user.ID] = user
-
-	return user, nil
-}
-
 func (t *Tg) userFromGotdUser(u *gotdTg.User) *User {
 	return &User{User: u}
 }
