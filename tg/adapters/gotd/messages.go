@@ -52,6 +52,10 @@ func (m *Message) IsForwarded() bool {
 	return m.FwdFromPeer != nil
 }
 
+func (m *Message) ForwardedFrom() tg.Peer {
+	return m.FwdFromPeer
+}
+
 func (m *Message) IsOutgoing() bool {
 	return m.msg.Out
 }
@@ -136,12 +140,6 @@ func (m *Message) ReplyToMsg(ctx context.Context, tgT tg.Tg) (tg.Message, error)
 	}
 
 	return nil, errors.New("unexpected error")
-}
-
-func (m *Message) ForwardedFrom(_ context.Context, _ tg.Tg) (tg.Peer, error) {
-	// TODO: Implement
-
-	return nil, nil
 }
 
 func (m *Message) Reply(ctx context.Context, content string) error {
@@ -248,6 +246,16 @@ func (t *Tg) fromGotdMessage(ctx context.Context, gotdMsg *gotdTg.Message) (tg.M
 
 	if msgBase.Peer == nil {
 		return nil, errors.New("peer is nil though gotdPeer is: " + peer.String())
+	}
+
+	fwdFrom, ok := gotdMsg.GetFwdFrom()
+
+	if ok {
+		fwdFromID, ok := fwdFrom.GetFromID()
+
+		if ok {
+			msgBase.FwdFromPeer = t.peerFromGotdPeer(ctx, fwdFromID)
+		}
 	}
 
 	switch msgBase.Peer.(type) {

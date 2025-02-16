@@ -11,12 +11,12 @@ type Message interface {
 	Sender() Peer
 	Author() Peer
 	IsForwarded() bool
+	ForwardedFrom() Peer
 	Content() string
 	IsOutgoing() bool
 	CreatedAt() time.Time
 
 	ReplyToMsg(ctx context.Context, t Tg) (Message, error)
-	ForwardedFrom(ctx context.Context, t Tg) (Peer, error)
 
 	Reply(ctx context.Context, content string) error
 	RelativeHistory(ctx context.Context, offset int64, limit int64) ([]Message, error)
