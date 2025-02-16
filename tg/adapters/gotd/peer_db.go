@@ -23,6 +23,19 @@ func (t *Tg) putUserToPeerDb(ctx context.Context, user *gotdTg.User) error {
 	})
 }
 
+func (t *Tg) putUsersToPeerDb(ctx context.Context, users []gotdTg.UserClass) error {
+	var err error
+
+	for _, userClass := range users {
+		switch user := userClass.(type) {
+		case *gotdTg.User:
+			err = t.putUserToPeerDb(ctx, user)
+		}
+	}
+
+	return err
+}
+
 func (t *Tg) putChatToPeerDb(ctx context.Context, chatClass gotdTg.ChatClass) error {
 	key := dialogs.DialogKey{}
 
@@ -54,6 +67,16 @@ func (t *Tg) putChatToPeerDb(ctx context.Context, chatClass gotdTg.ChatClass) er
 	}
 
 	return t.peerDB.Add(ctx, sp)
+}
+
+func (t *Tg) putChatsToPeerDb(ctx context.Context, chats []gotdTg.ChatClass) error {
+	var err error
+
+	for _, chatClass := range chats {
+		err = t.putChatToPeerDb(ctx, chatClass)
+	}
+
+	return err
 }
 
 func (t *Tg) putChannelToPeerDb(ctx context.Context, channel *gotdTg.Channel) error {

@@ -3,7 +3,9 @@ package gotd
 import (
 	"context"
 	"github.com/bitia-ru/gotg/tg"
+	"github.com/bitia-ru/gotg/utils"
 	"github.com/go-faster/errors"
+	"github.com/gotd/td/telegram/message"
 	gotdTg "github.com/gotd/td/tg"
 	"time"
 )
@@ -15,7 +17,7 @@ type MessageData struct {
 	FromPeer    tg.Peer
 	FwdFromPeer tg.Peer
 
-	replyToMsgID int64
+	replyToMsg tg.Message
 }
 
 type Message struct {
@@ -58,24 +60,111 @@ func (m *Message) CreatedAt() time.Time {
 	return time.Unix(int64(m.msg.Date), 0)
 }
 
-func (m *Message) ReplyToMsgID() int64 {
-	if m.replyToMsgID != 0 {
-		return m.replyToMsgID
+func (m *Message) ReplyToMsg(ctx context.Context, tgT tg.Tg) (tg.Message, error) {
+	t, ok := tgT.(*Tg)
+
+	if !ok {
+		return nil, errors.New("Wrong Tg implementation")
+	}
+
+	if m.replyToMsg != nil {
+		return m.replyToMsg, nil
 	}
 
 	if m.msg.ReplyTo == nil {
-		return 0
+		return nil, nil
 	}
 
 	msgReplyHeader, ok := m.msg.ReplyTo.(*gotdTg.MessageReplyHeader)
 
 	if !ok {
-		return 0
+		return nil, errors.New("reply header is not a message reply header")
 	}
 
-	m.replyToMsgID = int64(msgReplyHeader.ReplyToMsgID)
+	if _, ok := msgReplyHeader.GetReplyFrom(); ok {
+		// Reply to a message in an another place
+		// TODO: Implement
 
-	return m.replyToMsgID
+		return nil, nil
+	}
+
+	var err error
+	var mmc gotdTg.MessagesMessagesClass
+
+	where := m.Where()
+
+	if where.Type() == tg.PeerTypeUser || (where.Type() == tg.PeerTypeChat && where.(*Chat).isGotdChat()) {
+		mmc, err = t.api.MessagesGetMessages(ctx, []gotdTg.InputMessageClass{
+			&gotdTg.InputMessageReplyTo{
+				ID: m.msg.ID,
+			},
+		})
+	} else {
+		mmc, err = t.api.ChannelsGetMessages(ctx, &gotdTg.ChannelsGetMessagesRequest{
+			Channel: where.(ChatOrChannel).asInput(),
+			ID: []gotdTg.InputMessageClass{
+				&gotdTg.InputMessageReplyTo{
+					ID: m.msg.ID,
+				},
+			},
+		})
+	}
+
+	if err != nil {
+		return nil, errors.Wrap(err, "error fetching message")
+	}
+
+	switch messages := mmc.(type) {
+	case gotdTg.ModifiedMessagesMessages:
+		utils.Warn(t.putUsersToPeerDb(ctx, messages.GetUsers()), "error putting users to peerDB")
+		utils.Warn(t.putChatsToPeerDb(ctx, messages.GetChats()), "error putting chats to peerDB")
+
+		for _, msgClass := range messages.GetMessages() {
+			switch msg := msgClass.(type) {
+			case *gotdTg.Message:
+				gotdTgMsg, err := t.fromGotdMessage(ctx, msg)
+
+				if err != nil {
+					return nil, errors.Wrap(err, "error converting message")
+				}
+
+				m.replyToMsg = gotdTgMsg
+
+				return m.replyToMsg, nil
+			}
+		}
+	}
+
+	return nil, errors.New("unexpected error")
+}
+
+func (m *Message) ForwardedFrom(_ context.Context, _ tg.Tg) (tg.Peer, error) {
+	// TODO: Implement
+
+	return nil, nil
+}
+
+func (m *Message) Reply(ctx context.Context, content string) error {
+	t, ok := ctx.Value("gotd").(*Tg)
+
+	if !ok {
+		return errors.New("gotd api not found")
+	}
+
+	sender := message.NewSender(t.api)
+
+	var err error
+
+	switch m.Where().Type() {
+	case tg.PeerTypeUser:
+		_, err = sender.To(m.Where().(*User).AsInputPeer()).Reply(m.msg.ID).Text(ctx, content)
+	case tg.PeerTypeChat:
+		_, err = sender.To(m.Where().(*Chat).asInputPeer()).Reply(m.msg.ID).Text(ctx, content)
+	case tg.PeerTypeChannel:
+		panic("not implemented")
+	}
+
+	return err
 }
 
 func (m *Message) RelativeHistory(ctx context.Context, offset int64, limit int64) ([]tg.Message, error) {
@@ -117,8 +206,8 @@ func (m *Message) RelativeHistory(ctx context.Context, offset int64, limit int64
 
 	messages := result.(gotdTg.ModifiedMessagesMessages)
 
-	for _, message := range messages.GetMessages() {
-		msg, ok := message.(*gotdTg.Message)
+	for _, msgClass := range messages.GetMessages() {
+		msg, ok := msgClass.(*gotdTg.Message)
 
 		if !ok {
 			continue
@@ -156,6 +245,10 @@ func (t *Tg) fromGotdMessage(ctx context.Context, gotdMsg *gotdTg.Message) (tg.M
 	}
 
 	msgBase.Peer = t.peerFromGotdPeer(ctx, peer)
+
+	if msgBase.Peer == nil {
+		return nil, errors.New("peer is nil though gotdPeer is: " + peer.String())
+	}
 
 	switch msgBase.Peer.(type) {
 	case *User:

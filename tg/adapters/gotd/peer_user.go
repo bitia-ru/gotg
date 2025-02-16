@@ -85,13 +85,8 @@ func (u *User) SendMessage(ctx context.Context, text string) error {
 	return err
 }
 
-func (u *User) accessHash() int64 {
-	if u.User.AccessHash == 0 {
-		// TODO: obtain access hash
-		panic("no access hash in User")
-	}
-
-	return u.User.AccessHash
+func (u *User) asInputPeer() gotdTg.InputPeerClass {
+	return u.AsInputPeer()
 }
 
 func (t *Tg) userFromGotdUser(u *gotdTg.User) *User {

@@ -8,6 +8,14 @@ import (
 	gotdTg "github.com/gotd/td/tg"
 )
 
+type Peer interface {
+	asInputPeer() gotdTg.InputPeerClass
+}
+
+type ChatOrChannel interface {
+	asInput() gotdTg.InputChannelClass
+}
+
 func (t *Tg) peerFromGotdPeer(ctx context.Context, peer gotdTg.PeerClass) tg.Peer {
 	switch peer := peer.(type) {
 	case *gotdTg.PeerUser:

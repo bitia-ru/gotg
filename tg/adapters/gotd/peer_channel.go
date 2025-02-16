@@ -27,12 +27,16 @@ func (c *Channel) Type() tg.PeerType {
 	return tg.PeerTypeChannel
 }
 
-func (c *Channel) SendMessage(ctx context.Context, content string) error {
+func (c *Channel) SendMessage(_ context.Context, _ string) error {
 	return nil
 }
 
-func (c *Channel) accessHash() int64 {
-	return c.Channel.AccessHash
+func (c *Channel) asInputPeer() gotdTg.InputPeerClass {
+	return c.AsInputPeer()
+}
+
+func (c *Channel) asInput() gotdTg.InputChannelClass {
+	return c.AsInput()
 }
 
 func (t *Tg) channelFromGotdChannel(channel *gotdTg.Channel) *Channel {

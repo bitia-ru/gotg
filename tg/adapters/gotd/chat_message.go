@@ -3,36 +3,11 @@ package gotd
 import (
 	"context"
 	"github.com/go-faster/errors"
-	"github.com/gotd/td/telegram/message"
 	gotdTg "github.com/gotd/td/tg"
 )
 
 type ChatMessage struct {
 	Message
-}
-
-func (mc *ChatMessage) Reply(ctx context.Context, content string) error {
-	t, ok := ctx.Value("gotd").(*Tg)
-
-	if !ok {
-		return errors.New("gotd api not found")
-	}
-
-	sender := message.NewSender(t.api)
-
-	if chat := mc.Where().(*Chat).Chat; chat != nil {
-		_, err := sender.To(chat.AsInputPeer()).Reply(int(mc.ID())).Text(ctx, content)
-
-		return err
-	}
-
-	if channel := mc.Where().(*Chat).Channel; channel != nil {
-		_, err := sender.To(channel.AsInputPeer()).Reply(int(mc.ID())).Text(ctx, content)
-
-		return err
-	}
-
-	return errors.Errorf("Unknown chat type: %T", mc.Where())
 }
 
 func (t *Tg) chatMessageFromGotdMessage(ctx context.Context, gotdMsg *gotdTg.Message) (*ChatMessage, error) {

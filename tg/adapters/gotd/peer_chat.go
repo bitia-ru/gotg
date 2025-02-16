@@ -68,7 +68,7 @@ func (c *Chat) Type() tg.PeerType {
 	return ""
 }
 
-func (c *Chat) SendMessage(ctx context.Context, content string) error {
+func (c *Chat) SendMessage(_ context.Context, _ string) error {
 	return nil
 }
 
@@ -80,12 +80,20 @@ func (c *Chat) isGotdChannel() bool {
 	return c.Channel != nil
 }
 
-func (c *Chat) accessHash() int64 {
-	if c.isGotdChannel() {
-		return c.Channel.AccessHash
+func (c *Chat) asInputPeer() gotdTg.InputPeerClass {
+	if c.isGotdChat() {
+		return c.Chat.AsInputPeer()
 	}
 
-	return 0
+	return c.Channel.AsInputPeer()
+}
+
+func (c *Chat) asInput() gotdTg.InputChannelClass {
+	if c.isGotdChat() {
+		return nil
+	}
+
+	return c.Channel.AsInput()
 }
 
 func (t *Tg) fetchBasicGroupById(id int64) (*gotdTg.Chat, error) {
