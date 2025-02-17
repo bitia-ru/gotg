@@ -3,6 +3,7 @@ package gotd
 import (
 	"context"
 	"fmt"
+	"github.com/bitia-ru/blobdb/blobdb"
 	"github.com/bitia-ru/gotg/tg"
 	pebbledb "github.com/cockroachdb/pebble"
 	"github.com/go-faster/errors"
@@ -27,8 +28,8 @@ type Tg struct {
 
 	handlers tg.Handlers
 
-	store  *GotdTgStore
-	peerDB *pebble.PeerStorage
+	peerDB  *pebble.PeerStorage
+	mediaDB blobdb.Db
 
 	sessionStorage *telegram.FileSessionStorage
 	updatesManager *gotdUpdates.Manager
@@ -51,7 +52,7 @@ func NewTgClient(context context.Context, appID int, appHash string) tg.Tg {
 	var sessionDirPath string
 	sessionSubDir := filepath.Join("session", sessionFolder( /*TODO: */ "foo"))
 
-	sessionPathPrefix := os.Getenv("SESSION_PATH")
+	sessionPathPrefix := os.Getenv("TG_SESSION_PATH")
 	if sessionPathPrefix != "" {
 		sessionDirPath = filepath.Join(sessionPathPrefix, sessionSubDir)
 	} else {
@@ -98,7 +99,6 @@ func NewTgClient(context context.Context, appID int, appHash string) tg.Tg {
 
 	return &Tg{
 		context:        context,
-		store:          NewGotdTgStore(),
 		peerDB:         peerDB,
 		sessionStorage: sessionStorage,
 		updatesManager: updatesManager,
@@ -106,6 +106,10 @@ func NewTgClient(context context.Context, appID int, appHash string) tg.Tg {
 		api:            client.API(),
 		dispatcher:     &dispatcher,
 	}
+}
+
+func (t *Tg) SetMediaStorage(mediaDB blobdb.Db) {
+	t.mediaDB = mediaDB
 }
 
 func (t *Tg) IsAuthenticated(ctx context.Context) (bool, error) {

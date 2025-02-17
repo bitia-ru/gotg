@@ -2,9 +2,7 @@ package gotd
 
 import (
 	"context"
-	"fmt"
 	"github.com/bitia-ru/gotg/tg"
-	"github.com/go-faster/errors"
 	gotdTg "github.com/gotd/td/tg"
 )
 
@@ -94,38 +92,6 @@ func (c *Chat) asInput() gotdTg.InputChannelClass {
 	}
 
 	return c.Channel.AsInput()
-}
-
-func (t *Tg) fetchBasicGroupById(id int64) (*gotdTg.Chat, error) {
-	if t.store.Chats[id] != nil {
-		return t.store.Chats[id], nil
-	}
-
-	chatsClass, err := t.api.MessagesGetChats(t.context, []int64{id})
-
-	if err != nil {
-		return nil, err
-	}
-
-	chats := chatsClass.GetChats()
-
-	if len(chats) > 1 {
-		return nil, fmt.Errorf("got %d chats, expected 1", len(chats))
-	}
-
-	if len(chats) == 0 {
-		return nil, errors.New("got no chats")
-	}
-
-	return nil, nil
-}
-
-func (t *Tg) fetchSuperGroupById(id int64) (*gotdTg.Channel, error) {
-	if t.store.Channels[id] != nil {
-		return t.store.Channels[id], nil
-	}
-
-	return nil, nil
 }
 
 func (t *Tg) chatFromGotdChat(chat *gotdTg.Chat) *Chat {

@@ -2,11 +2,15 @@ package gotd
 
 import (
 	"context"
+	"fmt"
+	"github.com/bitia-ru/blobdb/blobdb"
 	"github.com/bitia-ru/gotg/tg"
 	"github.com/bitia-ru/gotg/utils"
 	"github.com/go-faster/errors"
+	"github.com/gotd/td/telegram/downloader"
 	"github.com/gotd/td/telegram/message"
 	gotdTg "github.com/gotd/td/tg"
+	"strconv"
 	"time"
 )
 
@@ -18,6 +22,8 @@ type MessageData struct {
 	FwdFromPeer tg.Peer
 
 	replyToMsg tg.Message
+
+	photo blobdb.Object
 }
 
 type Message struct {
@@ -62,6 +68,122 @@ func (m *Message) IsOutgoing() bool {
 
 func (m *Message) CreatedAt() time.Time {
 	return time.Unix(int64(m.msg.Date), 0)
+}
+
+func (m *Message) HasPhoto() bool {
+	switch m.msg.Media.(type) {
+	case *gotdTg.MessageMediaPhoto:
+		return true
+	}
+
+	return false
+}
+
+func (m *Message) IsReply() bool {
+	return m.msg.ReplyTo != nil
+}
+
+func (m *Message) Photo(ctx context.Context, tt tg.Tg) (blobdb.Object, error) {
+	if !m.HasPhoto() {
+		return nil, nil
+	}
+
+	if m.photo != nil {
+		return m.photo, nil
+	}
+
+	t, ok := tt.(*Tg)
+
+	if !ok {
+		return nil, errors.New("wrong Tg implementation")
+	}
+
+	if t.mediaDB == nil {
+		return nil, errors.New("no mediaDB")
+	}
+
+	object, err := t.mediaDB.FindBySecondaryID(
+		strconv.FormatInt(m.msg.Media.(*gotdTg.MessageMediaPhoto).Photo.GetID(), 10),
+	)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "mediaDB error")
+	}
+
+	if object != nil {
+		m.photo = object
+
+		return object, nil
+	}
+
+	switch media := m.msg.Media.(type) {
+	case *gotdTg.MessageMediaPhoto:
+		if photoClass, ok := media.GetPhoto(); ok {
+			if photo, ok := photoClass.AsNotEmpty(); ok {
+				var size string
+				w := 0
+
+				for _, s := range photo.Sizes {
+					switch s := s.(type) {
+					case *gotdTg.PhotoSize:
+						if s.W > w {
+							w = s.W
+							size = s.Type
+						}
+					case *gotdTg.PhotoCachedSize:
+						if s.W > w {
+							w = s.W
+							size = s.Type
+						}
+					case *gotdTg.PhotoSizeProgressive:
+						if s.W > w {
+							w = s.W
+							size = s.Type
+						}
+					}
+				}
+
+				if size != "" {
+					file, err := t.mediaDB.CreateEmptyFile()
+
+					if err != nil {
+						fmt.Println(errors.Wrap(err, "create empty file"))
+					} else {
+						d := downloader.NewDownloader()
+
+						_, err = d.Download(t.api, &gotdTg.InputPhotoFileLocation{
+							ID:            photo.ID,
+							AccessHash:    photo.AccessHash,
+							FileReference: photo.FileReference,
+							ThumbSize:     size,
+						}).Parallel(ctx, file)
+
+						if err != nil {
+							fmt.Println(errors.Wrap(err, "download photo"))
+						} else {
+							object, err := t.mediaDB.PutFile(file)
+
+							if err != nil {
+								fmt.Println(errors.Wrap(err, "put photo to media storage"))
+							}
+
+							m.photo = object
+
+							err = object.AddSecondaryID(strconv.FormatInt(photo.ID, 10))
+
+							if err != nil {
+								return object, errors.Wrap(err, "set secondary ID")
+							}
+
+							return object, nil
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return nil, errors.New("unexpected error")
 }
 
 func (m *Message) ReplyToMsg(ctx context.Context, tgT tg.Tg) (tg.Message, error) {

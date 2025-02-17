@@ -74,7 +74,9 @@ func main() {
 		)
 	}
 
-	c.Handlers().NewMessage = func(ctx context.Context, m tg.Message) {
+	c.Handlers().NewMessage = func(ctx context.Context, tgM tg.Message) {
+		m := tg.NewManagedMessage(ctx, c, tgM)
+
 		if m.IsOutgoing() {
 			return
 		}

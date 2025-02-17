@@ -1,3 +1,4 @@
 /go.work*
-sessions
+/sessions
+/storage
 /.DS_Store

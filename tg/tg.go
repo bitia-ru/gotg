@@ -2,6 +2,7 @@ package tg
 
 import (
 	"context"
+	"github.com/bitia-ru/blobdb/blobdb"
 )
 
 type AuthConfig struct {
@@ -25,6 +26,8 @@ type Tg interface {
 	) error
 	AuthenticateAsBot(ctx context.Context, token string) error
 	Start(ctx context.Context) error
+
+	SetMediaStorage(mediaDB blobdb.Db)
 
 	Handlers() *Handlers
 
