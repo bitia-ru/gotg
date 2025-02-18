@@ -90,7 +90,9 @@ func main() {
 
 		fmt.Println(logMsg + ": " + m.Content())
 
-		_ = m.Reply(ctx, m.Content())
+		if m.Where().Type() != tg.PeerTypeChannel {
+			_ = m.Reply(ctx, m.Content())
+		}
 
 		if m.HasPhoto() {
 			photo, err := m.Photo()
