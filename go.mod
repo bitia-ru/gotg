@@ -3,8 +3,8 @@ module github.com/bitia-ru/gotg
 go 1.23.2
 
 require (
-	github.com/bitia-ru/blobdb v0.0.0-20250205184005-e6c89be1a97b
-	github.com/cockroachdb/pebble v1.1.3
+	github.com/bitia-ru/blobdb v0.0.1
+	github.com/cockroachdb/pebble v1.1.4
 	github.com/go-faster/errors v0.7.1
 	github.com/gotd/contrib v0.21.0
 	github.com/gotd/td v0.115.0
