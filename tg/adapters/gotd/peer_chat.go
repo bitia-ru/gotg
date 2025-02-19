@@ -2,7 +2,9 @@ package gotd
 
 import (
 	"context"
+	"errors"
 	"github.com/bitia-ru/gotg/tg"
+	"github.com/gotd/td/telegram/message"
 	gotdTg "github.com/gotd/td/tg"
 )
 
@@ -66,8 +68,18 @@ func (c *Chat) Type() tg.PeerType {
 	return ""
 }
 
-func (c *Chat) SendMessage(_ context.Context, _ string) error {
-	return nil
+func (c *Chat) SendMessage(ctx context.Context, text string) error {
+	t, ok := ctx.Value("gotd").(*Tg)
+
+	if !ok {
+		return errors.New("gotd api not found")
+	}
+
+	sender := message.NewSender(t.api)
+
+	_, err := sender.To(c.asInputPeer()).Text(ctx, text)
+
+	return err
 }
 
 func (c *Chat) isGotdChat() bool {
