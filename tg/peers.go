@@ -2,7 +2,6 @@ package tg
 
 import (
 	"context"
-	"fmt"
 )
 
 type PeerType string
@@ -43,49 +42,7 @@ type PeerChat interface {
 type PeerChannel interface {
 	Peer
 
-	Title() string
-	Description() string
-	SubscribersCount() int
-}
-
-type Chat struct {
-	ID    int64
-	Title string
-}
-
-func (c *Chat) String() string {
-	return fmt.Sprintf("<Chat: %s>", c.Title)
-}
-
-type Channel struct {
-	ID    int64
-	Title string
-}
-
-func (c *Channel) String() string {
-	return fmt.Sprintf("<Channel: %s>", c.Title)
-}
-
-type ChatPeer struct {
-	Chat
-}
-
-func (c ChatPeer) Name() string {
-	return c.Title
-}
-
-func (c ChatPeer) ID() int64 {
-	return c.Chat.ID
-}
-
-type ChannelPeer struct {
-	Channel
-}
-
-func (c ChannelPeer) Name() string {
-	return c.Title
-}
-
-func (c ChannelPeer) ID() int64 {
-	return c.Channel.ID
+	// Title() string
+	Description(ctx context.Context, t Tg) string
+	// SubscribersCount() int
 }

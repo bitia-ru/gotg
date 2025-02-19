@@ -43,6 +43,32 @@ func (c *Channel) SendMessage(ctx context.Context, text string) error {
 	return err
 }
 
+func (c *Channel) Description(ctx context.Context, tt tg.Tg) string {
+	if c.ChannelFull == nil {
+		t, ok := tt.(*Tg)
+
+		if !ok {
+			return ""
+		}
+
+		messagesChatFull, err := t.api.ChannelsGetFullChannel(ctx, c.asInput())
+
+		if err != nil {
+			return ""
+		}
+
+		channelFull, ok := messagesChatFull.FullChat.(*gotdTg.ChannelFull)
+
+		if !ok {
+			return ""
+		}
+
+		c.ChannelFull = channelFull
+	}
+
+	return c.ChannelFull.About
+}
+
 func (c *Channel) asInputPeer() gotdTg.InputPeerClass {
 	return c.AsInputPeer()
 }
