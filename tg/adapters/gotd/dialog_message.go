@@ -17,5 +17,5 @@ func (md *DialogMessage) Author() tg.Peer {
 		return md.FwdFromPeer
 	}
 
-	return md.Peer
+	return md.FromPeer
 }

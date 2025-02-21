@@ -339,7 +339,7 @@ func (m *Message) RelativeHistory(ctx context.Context, offset int64, limit int64
 			return nil, errors.Wrap(err, "error converting message")
 		}
 
-		resultMessages = append(resultMessages, gotgMessage)
+		resultMessages = append([]tg.Message{gotgMessage}, resultMessages...)
 	}
 
 	return resultMessages, nil
@@ -386,7 +386,17 @@ func (t *Tg) fromGotdMessage(ctx context.Context, gotdMsg *gotdTg.Message) (tg.M
 			Message: msgBase,
 		}
 
-		msgDialog.FromPeer = msgBase.Peer
+		if gotdMsg.Out {
+			gotdSelfUser, err := t.client.Self(ctx)
+
+			if err != nil {
+				return nil, errors.Wrap(err, "error getting self user")
+			}
+
+			msgDialog.FromPeer = t.userFromGotdUser(gotdSelfUser)
+		} else {
+			msgDialog.FromPeer = msgBase.Peer
+		}
 
 		return &msgDialog, nil
 	case *Chat:
