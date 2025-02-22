@@ -37,6 +37,8 @@ type Tg struct {
 	client         *telegram.Client
 	api            *gotdTg.Client
 	dispatcher     *gotdTg.UpdateDispatcher
+
+	self *User
 }
 
 type TgConfig struct {
@@ -182,6 +184,8 @@ func (t *Tg) Start(ctx context.Context) error {
 		if err != nil {
 			return errors.Wrap(err, "call self")
 		}
+
+		t.self = t.userFromGotdUser(self)
 
 		authOptions := gotdUpdates.AuthOptions{
 			IsBot: self.Bot,

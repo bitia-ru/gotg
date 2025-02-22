@@ -71,6 +71,10 @@ func (u *User) Bio() string {
 	return u.UserFull.About
 }
 
+func (u *User) IsBot() bool {
+	return u.User.Bot
+}
+
 func (u *User) SendMessage(ctx context.Context, text string) error {
 	t, ok := ctx.Value("gotd").(*Tg)
 
