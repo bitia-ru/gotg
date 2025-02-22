@@ -23,7 +23,9 @@ func main() {
 		panic("TG_APP_HASH is required")
 	}
 
-	c := gotd.NewTgClient(ctx, appId, os.Getenv("TG_APP_HASH"))
+	c := gotd.NewTgClient(ctx, appId, os.Getenv("TG_APP_HASH"), gotd.TgConfig{
+		SessionRoot: "sessions/user",
+	})
 
 	c.Handlers().CodeRequest = func() string {
 		fmt.Print("Enter code: ")

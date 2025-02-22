@@ -38,7 +38,9 @@ func main() {
 		panic("TG_STORAGE_DIR is required")
 	}
 
-	c := gotd.NewTgClient(ctx, appId, appHash)
+	c := gotd.NewTgClient(ctx, appId, appHash, gotd.TgConfig{
+		SessionRoot: "sessions/bot",
+	})
 
 	blobDB, err := blobdbfs.Open(path.Join(storageDir, "photos"))
 

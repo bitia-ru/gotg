@@ -20,6 +20,7 @@ import (
 	"golang.org/x/time/rate"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -38,26 +39,36 @@ type Tg struct {
 	dispatcher     *gotdTg.UpdateDispatcher
 }
 
-func sessionFolder(phone string) string {
-	var out []rune
-	for _, r := range phone {
-		if r >= '0' && r <= '9' {
-			out = append(out, r)
-		}
-	}
-	return "phone-" + string(out)
+type TgConfig struct {
+	SessionRoot   string
+	SessionSubDir string
 }
 
-func NewTgClient(context context.Context, appID int, appHash string) tg.Tg {
-	var sessionDirPath string
-	sessionSubDir := filepath.Join("session", sessionFolder( /*TODO: */ "foo"))
+// sessionRoot = cfg.SessionRoot || os.Getenv("TG_SESSION_PATH") || "/var/lib/tg-sessions"
+// sessionSubDir = cfg.SessionSubDir || <appId>
 
-	sessionPathPrefix := os.Getenv("TG_SESSION_PATH")
-	if sessionPathPrefix != "" {
-		sessionDirPath = filepath.Join(sessionPathPrefix, sessionSubDir)
+func NewTgClient(context context.Context, appID int, appHash string, config TgConfig) tg.Tg {
+	var sessionRoot string
+	var sessionSubDir string
+	var sessionDirPath string
+
+	if config.SessionSubDir != "" {
+		sessionSubDir = config.SessionSubDir
 	} else {
-		sessionDirPath = filepath.Join("/var/lib/tg-crawler", sessionSubDir)
+		sessionSubDir = strconv.Itoa(appID)
 	}
+
+	if config.SessionRoot != "" {
+		sessionRoot = config.SessionRoot
+	} else {
+		sessionRoot = os.Getenv("TG_SESSION_PATH")
+
+		if sessionRoot == "" {
+			sessionRoot = "/var/lib/tg-sessions"
+		}
+	}
+
+	sessionDirPath = filepath.Join(sessionRoot, sessionSubDir)
 
 	sessionStorage := &telegram.FileSessionStorage{
 		Path: filepath.Join(sessionDirPath, "session.json"),
