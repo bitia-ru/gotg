@@ -27,17 +27,6 @@ func main() {
 		SessionRoot: "sessions/user",
 	})
 
-	c.Handlers().CodeRequest = func() string {
-		fmt.Print("Enter code: ")
-		code, err := bufio.NewReader(os.Stdin).ReadString('\n')
-
-		if err != nil {
-			return ""
-		}
-
-		return strings.TrimSpace(code)
-	}
-
 	c.Handlers().Start = func(ctx context.Context) {
 		if !utils.PanicOnErrorWrap(c.IsAuthenticated(ctx)) {
 			err := c.AuthenticateAsUser(ctx, phone, password, func() string {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	blobdbfs "github.com/bitia-ru/blobdb/blobdb-fs"
@@ -11,7 +10,6 @@ import (
 	"os"
 	"path"
 	"strconv"
-	"strings"
 )
 
 func main() {
@@ -49,13 +47,6 @@ func main() {
 	}
 
 	c.SetMediaStorage(blobDB)
-
-	c.Handlers().CodeRequest = func() string {
-		fmt.Print("Enter code: ")
-		code := utils.PanicOnErrorWrap(bufio.NewReader(os.Stdin).ReadString('\n'))
-
-		return strings.TrimSpace(code)
-	}
 
 	c.Handlers().Start = func(ctx context.Context) {
 		if !utils.PanicOnErrorWrap(c.IsAuthenticated(ctx)) {
