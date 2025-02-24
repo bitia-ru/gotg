@@ -79,6 +79,24 @@ func (m *Message) HasPhoto() bool {
 	return false
 }
 
+func (m *Message) HasVideo() bool {
+	switch media := m.msg.Media.(type) {
+	case *gotdTg.MessageMediaDocument:
+		return media.Video || media.Round
+	}
+
+	return false
+}
+
+func (m *Message) HasAudio() bool {
+	switch media := m.msg.Media.(type) {
+	case *gotdTg.MessageMediaDocument:
+		return media.Voice
+	}
+
+	return false
+}
+
 func (m *Message) IsReply() bool {
 	return m.msg.ReplyTo != nil
 }

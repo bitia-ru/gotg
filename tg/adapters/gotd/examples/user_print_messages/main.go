@@ -95,6 +95,14 @@ func main() {
 			logMsg += " in " + m.Where().Name()
 		}
 
+		if m.HasAudio() {
+			logMsg += " with audio"
+		}
+
+		if m.HasVideo() {
+			logMsg += " with video"
+		}
+
 		fmt.Println(logMsg + ": " + m.Content())
 
 		if m.Where().Type() != tg.PeerTypeChannel {
