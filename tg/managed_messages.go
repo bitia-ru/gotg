@@ -26,3 +26,7 @@ func (m ManagedMessage) ReplyToMsg() (Message, error) {
 func (m ManagedMessage) Photo() (blobdb.Object, error) {
 	return m.Message.Photo(m.ctx, m.t)
 }
+
+func (m ManagedMessage) MarkRead() error {
+	return m.Message.MarkRead(m.ctx, m.t)
+}

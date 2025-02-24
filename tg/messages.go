@@ -24,5 +24,6 @@ type Message interface {
 	Photo(ctx context.Context, t Tg) (blobdb.Object, error)
 	ReplyToMsg(ctx context.Context, t Tg) (Message, error)
 	Reply(ctx context.Context, content string) error
+	MarkRead(ctx context.Context, t Tg) error
 	RelativeHistory(ctx context.Context, offset int64, limit int64) ([]Message, error)
 }
