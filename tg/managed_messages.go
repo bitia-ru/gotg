@@ -30,3 +30,22 @@ func (m ManagedMessage) Photo() (blobdb.Object, error) {
 func (m ManagedMessage) MarkRead() error {
 	return m.Message.MarkRead(m.ctx, m.t)
 }
+
+type ManagedServiceMessage struct {
+	ctx context.Context
+	t   Tg
+
+	ServiceMessage
+}
+
+func NewManagedServiceMessage(ctx context.Context, t Tg, m ServiceMessage) ManagedServiceMessage {
+	return ManagedServiceMessage{
+		ctx:            ctx,
+		t:              t,
+		ServiceMessage: m,
+	}
+}
+
+func (m ManagedServiceMessage) MarkRead() error {
+	return m.ServiceMessage.MarkRead(m.ctx, m.t)
+}

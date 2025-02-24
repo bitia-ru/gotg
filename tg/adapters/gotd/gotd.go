@@ -198,25 +198,25 @@ func (t *Tg) Start(ctx context.Context) error {
 		}
 
 		t.dispatcher.OnNewMessage(func(ctx context.Context, e gotdTg.Entities, update *gotdTg.UpdateNewMessage) error {
-			gotdMsg, ok := update.Message.(*gotdTg.Message)
-
-			if !ok {
-				// Ignore service messages.
-				return nil
+			switch gotdMsg := update.Message.(type) {
+			case *gotdTg.Message:
+				return NewMessageDispatcher(ctx, t, gotdMsg)
+			case *gotdTg.MessageService:
+				return NewServiceMessageDispatcher(ctx, t, gotdMsg)
 			}
 
-			return NewMessageDispatcher(ctx, t, gotdMsg)
+			return nil
 		})
 
 		t.dispatcher.OnNewChannelMessage(func(ctx context.Context, e gotdTg.Entities, update *gotdTg.UpdateNewChannelMessage) error {
-			gotdMsg, ok := update.Message.(*gotdTg.Message)
-
-			if !ok {
-				// Ignore service messages.
-				return nil
+			switch gotdMsg := update.Message.(type) {
+			case *gotdTg.Message:
+				return NewMessageDispatcher(ctx, t, gotdMsg)
+			case *gotdTg.MessageService:
+				return NewServiceMessageDispatcher(ctx, t, gotdMsg)
 			}
 
-			return NewMessageDispatcher(ctx, t, gotdMsg)
+			return nil
 		})
 
 		return t.updatesManager.Run(ctx, t.api, self.ID, authOptions)

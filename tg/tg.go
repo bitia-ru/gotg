@@ -10,9 +10,10 @@ type AuthConfig struct {
 }
 
 type Handlers struct {
-	Start      func(ctx context.Context)
-	Ready      func(ctx context.Context, self PeerUser)
-	NewMessage func(ctx context.Context, m Message)
+	Start             func(ctx context.Context)
+	Ready             func(ctx context.Context, self PeerUser)
+	NewMessage        func(ctx context.Context, m Message)
+	NewServiceMessage func(ctx context.Context, m ServiceMessage)
 }
 
 type Tg interface {

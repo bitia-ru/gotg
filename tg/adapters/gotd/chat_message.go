@@ -30,6 +30,23 @@ func (cm *ChatMessage) MarkRead(ctx context.Context, tt tg.Tg) error {
 			Channel: cm.Where().(*Chat).asInput(),
 			MaxID:   int(cm.ID()),
 		})
+
+		if err != nil {
+			return err
+		}
+
+		r, ok := cm.msg.GetReplyTo()
+
+		if ok {
+			switch h := r.(type) {
+			case *gotdTg.MessageReplyHeader:
+				_, err = t.api.MessagesReadDiscussion(ctx, &gotdTg.MessagesReadDiscussionRequest{
+					Peer:      cm.Where().(*Chat).asInputPeer(),
+					MsgID:     h.ReplyToMsgID,
+					ReadMaxID: int(cm.ID()),
+				})
+			}
+		}
 	}
 
 	return err
