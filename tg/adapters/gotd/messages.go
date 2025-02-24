@@ -38,18 +38,6 @@ func (m *Message) Where() tg.Peer {
 	return m.MessageData.Peer
 }
 
-func (m *Message) Sender() tg.Peer {
-	return m.FromPeer
-}
-
-func (m *Message) Author() tg.Peer {
-	if m.IsForwarded() {
-		return m.FwdFromPeer
-	}
-
-	return m.FromPeer
-}
-
 func (m *Message) Content() string {
 	return m.msg.Message
 }

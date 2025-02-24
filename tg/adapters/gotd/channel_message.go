@@ -11,6 +11,19 @@ type ChannelMessage struct {
 	Message
 }
 
+func (cm *ChannelMessage) Sender() tg.Peer {
+	return cm.Peer
+}
+
+func (cm *ChannelMessage) Author() tg.Peer {
+	if cm.IsForwarded() {
+		return cm.FwdFromPeer
+	}
+
+	// Posting on behalf of the channel:
+	return cm.Peer
+}
+
 func (cm *ChannelMessage) MarkRead(ctx context.Context, tt tg.Tg) error {
 	t, ok := tt.(*Tg)
 

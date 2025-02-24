@@ -47,66 +47,65 @@ func (m *ServiceMessage) MarkRead(ctx context.Context, tt tg.Tg) error {
 
 	var err error
 
-	switch m.Where().(type) {
+	switch p := m.Where().(type) {
 	case *User:
 		_, err = t.api.MessagesReadHistory(ctx, &gotdTg.MessagesReadHistoryRequest{
-			Peer:  m.Where().(*User).asInputPeer(),
+			Peer:  p.asInputPeer(),
 			MaxID: int(m.ID()),
 		})
 	case *Chat:
-		if m.Where().(*Chat).isGotdChat() {
+		if p.isGotdChat() {
 			_, err = t.api.MessagesReadHistory(ctx, &gotdTg.MessagesReadHistoryRequest{
-				Peer:  m.Where().(*Chat).asInputPeer(),
+				Peer:  p.asInputPeer(),
 				MaxID: int(m.ID()),
 			})
 		} else {
-			_, err = t.api.ChannelsReadHistory(ctx, &gotdTg.ChannelsReadHistoryRequest{
-				Channel: m.Where().(*Chat).asInput(),
-				MaxID:   int(m.ID()),
-			})
+			if p.Forum {
+				var topicId = 1
 
-			if err != nil {
-				return err
-			}
+				r, ok := m.msg.GetReplyTo()
 
-			r, ok := m.msg.GetReplyTo()
-
-			if ok {
-				switch h := r.(type) {
-				case *gotdTg.MessageReplyHeader:
-					topId, ok := h.GetReplyToTopID()
-
-					if ok {
-						_, err = t.api.MessagesReadDiscussion(ctx, &gotdTg.MessagesReadDiscussionRequest{
-							Peer:      m.Where().(*Chat).asInputPeer(),
-							MsgID:     topId,
-							ReadMaxID: int(m.ID()),
-						})
-
-						if err != nil {
-							fmt.Println(err)
-						}
-					} else {
-						msgId, ok := h.GetReplyToMsgID()
-
-						if ok {
-							_, err = t.api.MessagesReadDiscussion(ctx, &gotdTg.MessagesReadDiscussionRequest{
-								Peer:      m.Where().(*Chat).asInputPeer(),
-								MsgID:     msgId,
-								ReadMaxID: int(m.ID()),
-							})
-
-							if err != nil {
-								fmt.Println(err)
+				if ok {
+					switch h := r.(type) {
+					case *gotdTg.MessageReplyHeader:
+						if h.ForumTopic {
+							if topId, ok := h.GetReplyToTopID(); ok {
+								// Reply to a message in a topic:
+								topicId = topId
+							} else if msgId, ok := h.GetReplyToMsgID(); ok {
+								// Message in a topic (technically a reply to the topic system message):
+								topicId = msgId
 							}
+						} else {
+							// General topic:
+							topicId = 1
 						}
 					}
+				}
+
+				_, err = t.api.MessagesReadDiscussion(ctx, &gotdTg.MessagesReadDiscussionRequest{
+					Peer:      p.asInputPeer(),
+					MsgID:     topicId,
+					ReadMaxID: int(m.ID()),
+				})
+
+				if err != nil {
+					fmt.Println(err)
+				}
+			} else {
+				_, err = t.api.ChannelsReadHistory(ctx, &gotdTg.ChannelsReadHistoryRequest{
+					Channel: p.asInput(),
+					MaxID:   int(m.ID()),
+				})
+
+				if err != nil {
+					return err
 				}
 			}
 		}
 	case *Channel:
 		_, err = t.api.ChannelsReadHistory(ctx, &gotdTg.ChannelsReadHistoryRequest{
-			Channel: m.Where().(*Chat).asInput(),
+			Channel: p.asInput(),
 			MaxID:   int(m.ID()),
 		})
 	}

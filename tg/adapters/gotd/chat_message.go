@@ -12,6 +12,27 @@ type ChatMessage struct {
 	Message
 }
 
+func (cm *ChatMessage) Sender() tg.Peer {
+	if cm.FromPeer != nil {
+		return cm.FromPeer
+	}
+
+	return cm.Peer
+}
+
+func (cm *ChatMessage) Author() tg.Peer {
+	if cm.IsForwarded() {
+		return cm.FwdFromPeer
+	}
+
+	if cm.FromPeer != nil {
+		return cm.FromPeer
+	}
+
+	// Posting on behalf of the channel/group:
+	return cm.Peer
+}
+
 func (cm *ChatMessage) MarkRead(ctx context.Context, tt tg.Tg) error {
 	t, ok := tt.(*Tg)
 
@@ -21,53 +42,54 @@ func (cm *ChatMessage) MarkRead(ctx context.Context, tt tg.Tg) error {
 
 	var err error
 
-	if cm.Where().(*Chat).isGotdChat() {
+	chat := cm.Where().(*Chat)
+
+	if chat.isGotdChat() {
 		_, err = t.api.MessagesReadHistory(ctx, &gotdTg.MessagesReadHistoryRequest{
-			Peer:  cm.Where().(*Chat).asInputPeer(),
+			Peer:  chat.asInputPeer(),
 			MaxID: int(cm.ID()),
 		})
 	} else {
-		_, err = t.api.ChannelsReadHistory(ctx, &gotdTg.ChannelsReadHistoryRequest{
-			Channel: cm.Where().(*Chat).asInput(),
-			MaxID:   int(cm.ID()),
-		})
+		if chat.Forum {
+			var topicId = 1
 
-		if err != nil {
-			return err
-		}
+			r, ok := cm.msg.GetReplyTo()
 
-		r, ok := cm.msg.GetReplyTo()
-
-		if ok {
-			switch h := r.(type) {
-			case *gotdTg.MessageReplyHeader:
-				topId, ok := h.GetReplyToTopID()
-
-				if ok {
-					_, err = t.api.MessagesReadDiscussion(ctx, &gotdTg.MessagesReadDiscussionRequest{
-						Peer:      cm.Where().(*Chat).asInputPeer(),
-						MsgID:     topId,
-						ReadMaxID: int(cm.ID()),
-					})
-
-					if err != nil {
-						fmt.Println(err)
-					}
-				} else {
-					msgId, ok := h.GetReplyToMsgID()
-
-					if ok {
-						_, err = t.api.MessagesReadDiscussion(ctx, &gotdTg.MessagesReadDiscussionRequest{
-							Peer:      cm.Where().(*Chat).asInputPeer(),
-							MsgID:     msgId,
-							ReadMaxID: int(cm.ID()),
-						})
-
-						if err != nil {
-							fmt.Println(err)
+			if ok {
+				switch h := r.(type) {
+				case *gotdTg.MessageReplyHeader:
+					if h.ForumTopic {
+						if topId, ok := h.GetReplyToTopID(); ok {
+							// Reply to a message in a topic:
+							topicId = topId
+						} else if msgId, ok := h.GetReplyToMsgID(); ok {
+							// Message in a topic (technically a reply to the topic system message):
+							topicId = msgId
 						}
+					} else {
+						// General topic:
+						topicId = 1
 					}
 				}
+			}
+
+			_, err = t.api.MessagesReadDiscussion(ctx, &gotdTg.MessagesReadDiscussionRequest{
+				Peer:      chat.asInputPeer(),
+				MsgID:     topicId,
+				ReadMaxID: int(cm.ID()),
+			})
+
+			if err != nil {
+				fmt.Println(err)
+			}
+		} else {
+			_, err = t.api.ChannelsReadHistory(ctx, &gotdTg.ChannelsReadHistoryRequest{
+				Channel: chat.asInput(),
+				MaxID:   int(cm.ID()),
+			})
+
+			if err != nil {
+				return err
 			}
 		}
 	}
