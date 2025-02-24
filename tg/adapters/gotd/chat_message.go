@@ -3,6 +3,7 @@ package gotd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/bitia-ru/gotg/tg"
 	gotdTg "github.com/gotd/td/tg"
 )
@@ -40,11 +41,33 @@ func (cm *ChatMessage) MarkRead(ctx context.Context, tt tg.Tg) error {
 		if ok {
 			switch h := r.(type) {
 			case *gotdTg.MessageReplyHeader:
-				_, err = t.api.MessagesReadDiscussion(ctx, &gotdTg.MessagesReadDiscussionRequest{
-					Peer:      cm.Where().(*Chat).asInputPeer(),
-					MsgID:     h.ReplyToTopID,
-					ReadMaxID: int(cm.ID()),
-				})
+				topId, ok := h.GetReplyToTopID()
+
+				if ok {
+					_, err = t.api.MessagesReadDiscussion(ctx, &gotdTg.MessagesReadDiscussionRequest{
+						Peer:      cm.Where().(*Chat).asInputPeer(),
+						MsgID:     topId,
+						ReadMaxID: int(cm.ID()),
+					})
+
+					if err != nil {
+						fmt.Println(err)
+					}
+				} else {
+					msgId, ok := h.GetReplyToMsgID()
+
+					if ok {
+						_, err = t.api.MessagesReadDiscussion(ctx, &gotdTg.MessagesReadDiscussionRequest{
+							Peer:      cm.Where().(*Chat).asInputPeer(),
+							MsgID:     msgId,
+							ReadMaxID: int(cm.ID()),
+						})
+
+						if err != nil {
+							fmt.Println(err)
+						}
+					}
+				}
 			}
 		}
 	}
