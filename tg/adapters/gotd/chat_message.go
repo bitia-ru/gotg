@@ -42,7 +42,7 @@ func (cm *ChatMessage) MarkRead(ctx context.Context, tt tg.Tg) error {
 			case *gotdTg.MessageReplyHeader:
 				_, err = t.api.MessagesReadDiscussion(ctx, &gotdTg.MessagesReadDiscussionRequest{
 					Peer:      cm.Where().(*Chat).asInputPeer(),
-					MsgID:     h.ReplyToMsgID,
+					MsgID:     h.ReplyToTopID,
 					ReadMaxID: int(cm.ID()),
 				})
 			}
