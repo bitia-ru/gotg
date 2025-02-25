@@ -18,6 +18,7 @@ import (
 	gotdTg "github.com/gotd/td/tg"
 	bboltdb "go.etcd.io/bbolt"
 	"golang.org/x/time/rate"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -39,11 +40,15 @@ type Tg struct {
 	dispatcher     *gotdTg.UpdateDispatcher
 
 	self *User
+
+	log *Logger
 }
 
 type TgConfig struct {
 	SessionRoot   string
 	SessionSubDir string
+
+	LogLevel LogLevelType
 }
 
 // sessionRoot = cfg.SessionRoot || os.Getenv("TG_SESSION_PATH") || "/var/lib/tg-sessions"
@@ -118,6 +123,7 @@ func NewTgClient(context context.Context, appID int, appHash string, config TgCo
 		client:         client,
 		api:            client.API(),
 		dispatcher:     &dispatcher,
+		log:            NewLogger(os.Stdout, "gotg", log.LstdFlags, config.LogLevel),
 	}
 }
 
@@ -200,8 +206,12 @@ func (t *Tg) Start(ctx context.Context) error {
 		t.dispatcher.OnNewMessage(func(ctx context.Context, e gotdTg.Entities, update *gotdTg.UpdateNewMessage) error {
 			switch gotdMsg := update.Message.(type) {
 			case *gotdTg.Message:
+				t.log.Debug("New message with ID=%d in chat with ID=%s", gotdMsg.GetID(), gotdMsg.GetPeerID().String())
+
 				return NewMessageDispatcher(ctx, t, gotdMsg)
 			case *gotdTg.MessageService:
+				t.log.Debug("New system message with ID=%d in chat with ID=%s", gotdMsg.GetID(), gotdMsg.GetPeerID().String())
+
 				return NewServiceMessageDispatcher(ctx, t, gotdMsg)
 			}
 
@@ -211,8 +221,12 @@ func (t *Tg) Start(ctx context.Context) error {
 		t.dispatcher.OnNewChannelMessage(func(ctx context.Context, e gotdTg.Entities, update *gotdTg.UpdateNewChannelMessage) error {
 			switch gotdMsg := update.Message.(type) {
 			case *gotdTg.Message:
+				t.log.Debug("New message with ID=%d in chat with ID=%s", gotdMsg.GetID(), gotdMsg.GetPeerID().String())
+
 				return NewMessageDispatcher(ctx, t, gotdMsg)
 			case *gotdTg.MessageService:
+				t.log.Debug("New system message with ID=%d in chat with ID=%s", gotdMsg.GetID(), gotdMsg.GetPeerID().String())
+
 				return NewServiceMessageDispatcher(ctx, t, gotdMsg)
 			}
 
