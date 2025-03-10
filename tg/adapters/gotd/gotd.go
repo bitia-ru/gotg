@@ -305,3 +305,7 @@ func (t *Tg) FindPeerBySlug(ctx context.Context, slug string) (tg.Peer, error) {
 
 	return nil, errors.New("peer not found")
 }
+
+func (t *Tg) FindChannelChatById(ctx context.Context, id int64) (tg.Peer, error) {
+	return t.peerFromGotdPeer(ctx, &gotdTg.PeerChannel{ChannelID: id}), nil
+}
