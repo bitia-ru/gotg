@@ -89,6 +89,27 @@ func (u *User) SendMessage(ctx context.Context, text string) error {
 	return err
 }
 
+func (u *User) RemoveMessages(ctx context.Context, ids ...int64) error {
+	t, ok := ctx.Value("gotd").(*Tg)
+
+	if !ok {
+		return errors.New("gotd api not found")
+	}
+
+	intIds := make([]int, len(ids))
+
+	for i, id := range ids {
+		intIds[i] = int(id)
+	}
+
+	_, err := t.api.MessagesDeleteMessages(ctx, &gotdTg.MessagesDeleteMessagesRequest{
+		Revoke: true,
+		ID:     intIds,
+	})
+
+	return err
+}
+
 func (u *User) asInputPeer() gotdTg.InputPeerClass {
 	return u.AsInputPeer()
 }

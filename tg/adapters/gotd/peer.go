@@ -60,6 +60,11 @@ func (t *Tg) peerFromGotdPeerInternal(ctx context.Context, peer gotdTg.PeerClass
 			Kind: dialogs.Channel,
 			ID:   peer.ChannelID,
 		}); err == nil {
+			if peerFromDb.Channel == nil {
+				// For example, if this is a channel that the bot removed from.
+				return nil
+			}
+
 			if peerFromDb.Channel.Broadcast {
 				return t.channelFromGotdChannel(peerFromDb.Channel)
 			} else {

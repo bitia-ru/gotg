@@ -43,6 +43,27 @@ func (c *Channel) SendMessage(ctx context.Context, text string) error {
 	return err
 }
 
+func (c *Channel) RemoveMessages(ctx context.Context, ids ...int64) error {
+	t, ok := ctx.Value("gotd").(*Tg)
+
+	if !ok {
+		return errors.New("gotd api not found")
+	}
+
+	intIds := make([]int, len(ids))
+
+	for i, id := range ids {
+		intIds[i] = int(id)
+	}
+
+	_, err := t.api.ChannelsDeleteMessages(ctx, &gotdTg.ChannelsDeleteMessagesRequest{
+		Channel: c.AsInput(),
+		ID:      intIds,
+	})
+
+	return err
+}
+
 func (c *Channel) Description(ctx context.Context, tt tg.Tg) string {
 	if c.ChannelFull == nil {
 		t, ok := tt.(*Tg)

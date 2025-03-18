@@ -126,10 +126,6 @@ func NewServiceMessageDispatcher(ctx context.Context, t *Tg, gotdMsg *gotdTg.Mes
 
 	serviceMessage.Peer = t.peerFromGotdPeer(ctx, peer)
 
-	if serviceMessage.Peer == nil {
-		return errors.New("peer is nil though gotdPeer is: " + peer.String())
-	}
-
 	if t.handlers.NewServiceMessage != nil {
 		t.handlers.NewServiceMessage(ctx, serviceMessage)
 	}

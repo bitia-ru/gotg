@@ -19,6 +19,13 @@ type Peer interface {
 	Type() PeerType
 
 	SendMessage(ctx context.Context, text string) error
+	RemoveMessages(ctx context.Context, ids ...int64) error
+}
+
+type PeerRoom interface {
+	Peer
+
+	BanMember(ctx context.Context, user PeerUser) error
 }
 
 type PeerUser interface {

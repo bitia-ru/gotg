@@ -82,6 +82,55 @@ func (c *Chat) SendMessage(ctx context.Context, text string) error {
 	return err
 }
 
+func (c *Chat) RemoveMessages(ctx context.Context, ids ...int64) error {
+	t, ok := ctx.Value("gotd").(*Tg)
+
+	if !ok {
+		return errors.New("gotd api not found")
+	}
+
+	intIds := make([]int, len(ids))
+	for i, id := range ids {
+		intIds[i] = int(id)
+	}
+
+	if c.isGotdChat() {
+		_, err := t.api.MessagesDeleteMessages(ctx, &gotdTg.MessagesDeleteMessagesRequest{
+			ID: intIds,
+		})
+		return err
+	}
+
+	_, err := t.api.ChannelsDeleteMessages(ctx, &gotdTg.ChannelsDeleteMessagesRequest{
+		Channel: c.asInput(),
+		ID:      intIds,
+	})
+
+	return err
+}
+
+func (c *Chat) BanMember(ctx context.Context, user tg.PeerUser) error {
+	t, ok := ctx.Value("gotd").(*Tg)
+
+	if !ok {
+		return errors.New("gotd api not found")
+	}
+
+	if c.isGotdChat() {
+		return errors.New("Ban in a group is not supported")
+	}
+
+	_, err := t.api.ChannelsEditBanned(ctx, &gotdTg.ChannelsEditBannedRequest{
+		Channel:     c.AsInput(),
+		Participant: user.(*User).AsInputPeer(),
+		BannedRights: gotdTg.ChatBannedRights{
+			ViewMessages: true,
+		},
+	})
+
+	return err
+}
+
 func (c *Chat) isGotdChat() bool {
 	return c.Chat != nil
 }
