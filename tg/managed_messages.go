@@ -31,6 +31,10 @@ func (m ManagedMessage) MarkRead() error {
 	return m.Message.MarkRead(m.ctx, m.t)
 }
 
+func (m ManagedMessage) Forward(to Peer) error {
+	return m.Message.Forward(m.ctx, m.t, to)
+}
+
 type ManagedServiceMessage struct {
 	ctx context.Context
 	t   Tg

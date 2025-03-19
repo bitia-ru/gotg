@@ -26,4 +26,5 @@ type Message interface {
 	Reply(ctx context.Context, content string) error
 	MarkRead(ctx context.Context, t Tg) error
 	RelativeHistory(ctx context.Context, offset int64, limit int64) ([]Message, error)
+	Forward(ctx context.Context, t Tg, to Peer) error
 }

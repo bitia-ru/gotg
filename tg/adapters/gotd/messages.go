@@ -7,6 +7,7 @@ import (
 	"github.com/bitia-ru/gotg/tg"
 	"github.com/bitia-ru/gotg/utils"
 	"github.com/go-faster/errors"
+	"github.com/gotd/td/crypto"
 	"github.com/gotd/td/telegram/downloader"
 	"github.com/gotd/td/telegram/message"
 	gotdTg "github.com/gotd/td/tg"
@@ -349,6 +350,28 @@ func (m *Message) RelativeHistory(ctx context.Context, offset int64, limit int64
 	}
 
 	return resultMessages, nil
+}
+
+func (m *Message) Forward(ctx context.Context, tt tg.Tg, to tg.Peer) error {
+	t, ok := tt.(*Tg)
+
+	if !ok {
+		return errors.New("wrong Tg implementation")
+	}
+
+	randomId, err := crypto.RandInt64(crypto.DefaultRand())
+	if err != nil {
+		return errors.Wrap(err, "generate random_id")
+	}
+
+	_, err = t.api.MessagesForwardMessages(ctx, &gotdTg.MessagesForwardMessagesRequest{
+		FromPeer: m.Where().(Peer).asInputPeer(),
+		ToPeer:   to.(Peer).asInputPeer(),
+		ID:       []int{int(m.ID())},
+		RandomID: []int64{randomId},
+	})
+
+	return err
 }
 
 func (t *Tg) fromGotdMessage(ctx context.Context, gotdMsg *gotdTg.Message) (tg.Message, error) {
