@@ -60,6 +60,15 @@ func main() {
 		fmt.Printf("Started (username: %s)\n", self.Username())
 	}
 
+	c.Handlers().NewServiceMessage = func(ctx context.Context, tgM tg.ServiceMessage) {
+		m := tg.NewManagedServiceMessage(ctx, c, tgM)
+
+		switch m.Action() {
+		case tg.ServiceMessageActionJoin:
+			_ = m.Where().SendMessage(ctx, fmt.Sprintf("%s joined", m.Sender().Name()))
+		}
+	}
+
 	c.Handlers().NewMessage = func(ctx context.Context, tgM tg.Message) {
 		m := tg.NewManagedMessage(ctx, c, tgM)
 

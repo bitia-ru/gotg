@@ -15,6 +15,7 @@ const (
 type ServiceMessage interface {
 	ID() int64
 	Where() Peer
+	Sender() Peer
 	CreatedAt() time.Time
 	Action() ServiceMessageAction
 
