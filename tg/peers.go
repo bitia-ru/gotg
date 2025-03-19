@@ -25,6 +25,10 @@ type Peer interface {
 type PeerRoom interface {
 	Peer
 
+	Title() string
+	// Description() string
+	// MembersCount() int
+
 	BanMember(ctx context.Context, user PeerUser) error
 }
 

@@ -68,6 +68,18 @@ func (c *Chat) Type() tg.PeerType {
 	return ""
 }
 
+func (c *Chat) Title() string {
+	if c.Chat != nil {
+		return c.Chat.Title
+	}
+
+	if c.Channel != nil {
+		return c.Channel.Title
+	}
+
+	return ""
+}
+
 func (c *Chat) SendMessage(ctx context.Context, text string) error {
 	t, ok := ctx.Value("gotd").(*Tg)
 

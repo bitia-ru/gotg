@@ -21,3 +21,12 @@ func Filter[T any](ss []T, test func(any) bool) (ret []T) {
 	}
 	return
 }
+
+func Contains[T comparable](ss []T, s T) bool {
+	for _, v := range ss {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
