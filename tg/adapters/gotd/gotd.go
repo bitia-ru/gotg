@@ -219,36 +219,48 @@ func (t *Tg) Start(ctx context.Context) error {
 				return nil
 			}
 
-			if participant, ok := update.GetNewParticipant(); ok {
-				participantAdded, ok := participant.(*gotdTg.ChannelParticipant)
+			var serviceMessage *ServiceMessageWithSubject
 
-				if !ok {
-					return nil
-				}
+			if participantClass, ok := update.GetNewParticipant(); ok {
+				switch participant := participantClass.(type) {
+				case *gotdTg.ChannelParticipant:
+					actor, err := t.FindUserById(ctx, participant.UserID)
 
-				actor, err := t.FindUserById(ctx, participantAdded.UserID)
+					if err != nil {
+						t.log.Debug("OnChannelParticipant: unable to find user by id: %v", err)
+						return nil
+					}
 
-				if err != nil {
-					t.log.Debug("OnChannelParticipant: unable to find user by id: %v", err)
-					return nil
-				}
-
-				serviceMessage := &ServiceMessageWithSubject{
-					ServiceMessage: ServiceMessage{
-						ServiceMessageData{
-							action: tg.ServiceMessageActionJoin,
-							where:  peerChannel,
+					serviceMessage = &ServiceMessageWithSubject{
+						ServiceMessage: ServiceMessage{
+							ServiceMessageData{
+								action: tg.ServiceMessageActionJoin,
+								where:  peerChannel,
+							},
 						},
-					},
-					subject: actor,
-				}
+						subject: actor,
+					}
+				case *gotdTg.ChannelParticipantBanned:
+					if participant.Left {
+						actor, err := t.FindUserById(ctx, participant.Peer.(*gotdTg.PeerUser).UserID)
 
-				if t.handlers.NewServiceMessage != nil {
-					t.handlers.NewServiceMessage(ctx, serviceMessage)
-				}
+						if err != nil {
+							t.log.Debug("OnChannelParticipant: unable to find user by id: %v", err)
+							return nil
+						}
 
-				return nil
-			} else if participant, ok = update.GetPrevParticipant(); ok {
+						serviceMessage = &ServiceMessageWithSubject{
+							ServiceMessage: ServiceMessage{
+								ServiceMessageData{
+									action: tg.ServiceMessageActionLeave,
+									where:  peerChannel,
+								},
+							},
+							subject: actor,
+						}
+					}
+				}
+			} else if participant, ok := update.GetPrevParticipant(); ok {
 				participantLeft, ok := participant.(*gotdTg.ChannelParticipant)
 
 				if !ok {
@@ -262,7 +274,7 @@ func (t *Tg) Start(ctx context.Context) error {
 					return nil
 				}
 
-				serviceMessage := &ServiceMessageWithSubject{
+				serviceMessage = &ServiceMessageWithSubject{
 					ServiceMessage: ServiceMessage{
 						ServiceMessageData{
 							action: tg.ServiceMessageActionLeave,
@@ -271,12 +283,10 @@ func (t *Tg) Start(ctx context.Context) error {
 					},
 					subject: actor,
 				}
+			}
 
-				if t.handlers.NewServiceMessage != nil {
-					t.handlers.NewServiceMessage(ctx, serviceMessage)
-				}
-
-				return nil
+			if serviceMessage != nil && t.handlers.NewServiceMessage != nil {
+				t.handlers.NewServiceMessage(ctx, serviceMessage)
 			}
 
 			return nil
