@@ -203,16 +203,91 @@ func (t *Tg) Start(ctx context.Context) error {
 			}
 		}
 
+		t.dispatcher.OnChatParticipant(func(ctx context.Context, e gotdTg.Entities, update *gotdTg.UpdateChatParticipant) error {
+			return nil
+		})
+
+		t.dispatcher.OnChatParticipantAdd(func(ctx context.Context, e gotdTg.Entities, update *gotdTg.UpdateChatParticipantAdd) error {
+			return nil
+		})
+
+		t.dispatcher.OnChannelParticipant(func(ctx context.Context, e gotdTg.Entities, update *gotdTg.UpdateChannelParticipant) error {
+			peerChannel, err := t.FindChannelChatById(ctx, update.ChannelID)
+
+			if err != nil {
+				t.log.Debug("find channel chat by id: %v", err)
+				return nil
+			}
+
+			if participant, ok := update.GetNewParticipant(); ok {
+				participantAdded, ok := participant.(*gotdTg.ChannelParticipant)
+
+				if !ok {
+					return nil
+				}
+
+				actor, err := t.FindUserById(ctx, participantAdded.UserID)
+
+				if err != nil {
+					t.log.Debug("OnChannelParticipant: unable to find user by id: %v", err)
+					return nil
+				}
+
+				serviceMessage := &ServiceMessageWithSubject{
+					ServiceMessage: ServiceMessage{
+						ServiceMessageData{
+							action: tg.ServiceMessageActionJoin,
+							where:  peerChannel,
+						},
+					},
+					subject: actor,
+				}
+
+				if t.handlers.NewServiceMessage != nil {
+					t.handlers.NewServiceMessage(ctx, serviceMessage)
+				}
+
+				return nil
+			} else if participant, ok = update.GetPrevParticipant(); ok {
+				participantLeft, ok := participant.(*gotdTg.ChannelParticipant)
+
+				if !ok {
+					return nil
+				}
+
+				actor, err := t.FindUserById(ctx, participantLeft.UserID)
+
+				if err != nil {
+					t.log.Debug("OnChannelParticipant: unable to find user by id: %v", err)
+					return nil
+				}
+
+				serviceMessage := &ServiceMessageWithSubject{
+					ServiceMessage: ServiceMessage{
+						ServiceMessageData{
+							action: tg.ServiceMessageActionLeave,
+							where:  peerChannel,
+						},
+					},
+					subject: actor,
+				}
+
+				if t.handlers.NewServiceMessage != nil {
+					t.handlers.NewServiceMessage(ctx, serviceMessage)
+				}
+
+				return nil
+			}
+
+			return nil
+		})
+
 		t.dispatcher.OnNewMessage(func(ctx context.Context, e gotdTg.Entities, update *gotdTg.UpdateNewMessage) error {
 			switch gotdMsg := update.Message.(type) {
 			case *gotdTg.Message:
 				t.log.Debug("New message with ID=%d in chat with ID=%s", gotdMsg.GetID(), gotdMsg.GetPeerID().String())
 
 				return NewMessageDispatcher(ctx, t, gotdMsg)
-			case *gotdTg.MessageService:
-				t.log.Debug("New system message with ID=%d in chat with ID=%s", gotdMsg.GetID(), gotdMsg.GetPeerID().String())
-
-				return NewServiceMessageDispatcher(ctx, t, gotdMsg)
 			}
 
 			return nil
@@ -224,10 +299,6 @@ func (t *Tg) Start(ctx context.Context) error {
 				t.log.Debug("New message with ID=%d in chat with ID=%s", gotdMsg.GetID(), gotdMsg.GetPeerID().String())
 
 				return NewMessageDispatcher(ctx, t, gotdMsg)
-			case *gotdTg.MessageService:
-				t.log.Debug("New system message with ID=%d in chat with ID=%s", gotdMsg.GetID(), gotdMsg.GetPeerID().String())
-
-				return NewServiceMessageDispatcher(ctx, t, gotdMsg)
 			}
 
 			return nil
@@ -308,4 +379,8 @@ func (t *Tg) FindPeerBySlug(ctx context.Context, slug string) (tg.Peer, error) {
 
 func (t *Tg) FindChannelChatById(ctx context.Context, id int64) (tg.Peer, error) {
 	return t.peerFromGotdPeer(ctx, &gotdTg.PeerChannel{ChannelID: id}), nil
+}
+
+func (t *Tg) FindUserById(ctx context.Context, id int64) (tg.Peer, error) {
+	return t.peerFromGotdPeer(ctx, &gotdTg.PeerUser{UserID: id}), nil
 }

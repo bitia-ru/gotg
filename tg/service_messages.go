@@ -1,23 +1,26 @@
 package tg
 
 import (
-	"context"
 	"time"
 )
 
 type ServiceMessageAction string
 
 const (
-	ServiceMessageActionJoin      ServiceMessageAction = "join"
 	ServiceMessageActionUndefined ServiceMessageAction = ""
+	ServiceMessageActionJoin      ServiceMessageAction = "join"
+	ServiceMessageActionLeave     ServiceMessageAction = "leave"
 )
 
 type ServiceMessage interface {
 	ID() int64
 	Where() Peer
-	Sender() Peer
 	CreatedAt() time.Time
 	Action() ServiceMessageAction
+}
 
-	MarkRead(ctx context.Context, tt Tg) error
+type ServiceMessageWithSubject interface {
+	ServiceMessage
+
+	Subject() Peer
 }
