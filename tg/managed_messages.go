@@ -19,8 +19,10 @@ func NewManagedMessage(ctx context.Context, t Tg, m Message) ManagedMessage {
 	}
 }
 
-func (m ManagedMessage) ReplyToMsg() (Message, error) {
-	return m.Message.ReplyToMsg(m.ctx, m.t)
+func (m ManagedMessage) ReplyToMsg() (ManagedMessage, error) {
+	msg, err := m.Message.ReplyToMsg(m.ctx, m.t)
+
+	return NewManagedMessage(m.ctx, m.t, msg), err
 }
 
 func (m ManagedMessage) Photo() (blobdb.Object, error) {
@@ -33,4 +35,8 @@ func (m ManagedMessage) MarkRead() error {
 
 func (m ManagedMessage) Forward(to Peer) error {
 	return m.Message.Forward(m.ctx, m.t, to)
+}
+
+func (m ManagedMessage) ForwardWithOptions(to Peer, options ForwardOptions) error {
+	return m.Message.ForwardWithOptions(m.ctx, m.t, to, options)
 }

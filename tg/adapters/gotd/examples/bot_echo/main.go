@@ -60,12 +60,18 @@ func main() {
 		fmt.Printf("Started (username: %s)\n", self.Username())
 	}
 
-	c.Handlers().NewServiceMessage = func(ctx context.Context, tgM tg.ServiceMessage) {
-		m := tg.NewManagedServiceMessage(ctx, c, tgM)
-
-		switch m.Action() {
+	c.Handlers().NewServiceMessage = func(ctx context.Context, msg tg.ServiceMessage) {
+		switch msg.Action() {
 		case tg.ServiceMessageActionJoin:
-			_ = m.Where().SendMessage(ctx, fmt.Sprintf("%s joined", m.Sender().Name()))
+			switch m := msg.(type) {
+			case tg.ServiceMessageWithSubject:
+				_ = m.Subject().SendMessage(ctx, fmt.Sprintf("%s joined", m.Subject().Name()))
+			}
+		case tg.ServiceMessageActionLeave:
+			switch m := msg.(type) {
+			case tg.ServiceMessageWithSubject:
+				_ = m.Subject().SendMessage(ctx, fmt.Sprintf("%s left", m.Subject().Name()))
+			}
 		}
 	}
 
@@ -112,8 +118,8 @@ func main() {
 			if err != nil {
 				fmt.Println("Failed to get reply to message:", err)
 			} else {
-				if replyToMsgM := tg.NewManagedMessage(ctx, c, replyToMsg); replyToMsgM.HasPhoto() {
-					photo, err := replyToMsgM.Photo()
+				if replyToMsg.HasPhoto() {
+					photo, err := replyToMsg.Photo()
 
 					if err != nil {
 						fmt.Println("Failed to get photo of reply to message:", err)

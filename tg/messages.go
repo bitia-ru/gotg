@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+type ForwardOptions struct {
+	DropAuthor        bool
+	DropMediaCaptions bool
+}
+
 type Message interface {
 	ID() int64
 	Where() Peer
@@ -27,4 +32,5 @@ type Message interface {
 	MarkRead(ctx context.Context, t Tg) error
 	RelativeHistory(ctx context.Context, offset int64, limit int64) ([]Message, error)
 	Forward(ctx context.Context, t Tg, to Peer) error
+	ForwardWithOptions(ctx context.Context, t Tg, to Peer, options ForwardOptions) error
 }

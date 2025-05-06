@@ -353,6 +353,10 @@ func (m *Message) RelativeHistory(ctx context.Context, offset int64, limit int64
 }
 
 func (m *Message) Forward(ctx context.Context, tt tg.Tg, to tg.Peer) error {
+	return m.ForwardWithOptions(ctx, tt, to, tg.ForwardOptions{})
+}
+
+func (m *Message) ForwardWithOptions(ctx context.Context, tt tg.Tg, to tg.Peer, options tg.ForwardOptions) error {
 	t, ok := tt.(*Tg)
 
 	if !ok {
@@ -365,10 +369,12 @@ func (m *Message) Forward(ctx context.Context, tt tg.Tg, to tg.Peer) error {
 	}
 
 	_, err = t.api.MessagesForwardMessages(ctx, &gotdTg.MessagesForwardMessagesRequest{
-		FromPeer: m.Where().(Peer).asInputPeer(),
-		ToPeer:   to.(Peer).asInputPeer(),
-		ID:       []int{int(m.ID())},
-		RandomID: []int64{randomId},
+		FromPeer:          m.Where().(Peer).asInputPeer(),
+		ToPeer:            to.(Peer).asInputPeer(),
+		ID:                []int{int(m.ID())},
+		RandomID:          []int64{randomId},
+		DropAuthor:        options.DropAuthor,
+		DropMediaCaptions: options.DropMediaCaptions,
 	})
 
 	return err
