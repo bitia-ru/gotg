@@ -26,7 +26,7 @@ type PeerRoom interface {
 	Peer
 
 	Title() string
-	// Description() string
+	Description(ctx context.Context, t Tg) string
 	// MembersCount() int
 
 	BanMember(ctx context.Context, user PeerUser) error

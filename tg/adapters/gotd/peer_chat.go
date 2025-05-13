@@ -80,6 +80,62 @@ func (c *Chat) Title() string {
 	return ""
 }
 
+func (c *Chat) Description(ctx context.Context, tt tg.Tg) string {
+	if c.Chat != nil {
+		if c.ChatFull == nil {
+			t, ok := tt.(*Tg)
+
+			if !ok {
+				return ""
+			}
+
+			messagesChatFull, err := t.api.MessagesGetFullChat(ctx, c.Chat.ID)
+
+			if err != nil {
+				return ""
+			}
+
+			chatFull, ok := messagesChatFull.FullChat.(*gotdTg.ChatFull)
+
+			if !ok {
+				return ""
+			}
+
+			c.ChatFull = chatFull
+		}
+
+		return c.ChatFull.About
+	}
+
+	if c.Channel != nil {
+		if c.ChannelFull == nil {
+			t, ok := tt.(*Tg)
+
+			if !ok {
+				return ""
+			}
+
+			messagesChatFull, err := t.api.ChannelsGetFullChannel(ctx, c.asInput())
+
+			if err != nil {
+				return ""
+			}
+
+			channelFull, ok := messagesChatFull.FullChat.(*gotdTg.ChannelFull)
+
+			if !ok {
+				return ""
+			}
+
+			c.ChannelFull = channelFull
+		}
+
+		return c.ChannelFull.About
+	}
+
+	return ""
+}
+
 func (c *Chat) SendMessage(ctx context.Context, text string) error {
 	t, ok := ctx.Value("gotd").(*Tg)
 
