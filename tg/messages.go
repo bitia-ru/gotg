@@ -18,6 +18,7 @@ type Message interface {
 	Author() Peer
 	IsForwarded() bool
 	ForwardedFrom() Peer
+	ForwardSourceID() int64
 	Content() string
 	IsOutgoing() bool
 	CreatedAt() time.Time

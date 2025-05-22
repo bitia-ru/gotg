@@ -51,6 +51,14 @@ func (m *Message) ForwardedFrom() tg.Peer {
 	return m.FwdFromPeer
 }
 
+func (m *Message) ForwardSourceID() int64 {
+	if m.IsForwarded() && m.ForwardedFrom().Type() == tg.PeerTypeChannel {
+		return int64(m.msg.FwdFrom.ChannelPost)
+	}
+
+	return -1
+}
+
 func (m *Message) IsOutgoing() bool {
 	return m.msg.Out
 }
