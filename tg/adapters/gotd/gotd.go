@@ -295,8 +295,6 @@ func (t *Tg) Start(ctx context.Context) error {
 		t.dispatcher.OnNewMessage(func(ctx context.Context, e gotdTg.Entities, update *gotdTg.UpdateNewMessage) error {
 			switch gotdMsg := update.Message.(type) {
 			case *gotdTg.Message:
-				t.log.Debug("New message with ID=%d in chat with ID=%s", gotdMsg.GetID(), gotdMsg.GetPeerID().String())
-
 				return NewMessageDispatcher(ctx, t, gotdMsg)
 			}
 
@@ -306,8 +304,6 @@ func (t *Tg) Start(ctx context.Context) error {
 		t.dispatcher.OnNewChannelMessage(func(ctx context.Context, e gotdTg.Entities, update *gotdTg.UpdateNewChannelMessage) error {
 			switch gotdMsg := update.Message.(type) {
 			case *gotdTg.Message:
-				t.log.Debug("New message with ID=%d in chat with ID=%s", gotdMsg.GetID(), gotdMsg.GetPeerID().String())
-
 				return NewMessageDispatcher(ctx, t, gotdMsg)
 			}
 
