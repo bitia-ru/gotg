@@ -79,7 +79,7 @@ func (t *Tg) peerFromGotdPeerInternal(ctx context.Context, peer gotdTg.PeerClass
 func (t *Tg) peerFromGotdPeer(ctx context.Context, gotdTgPeer gotdTg.PeerClass) tg.Peer {
 	peer := t.peerFromGotdPeerInternal(ctx, gotdTgPeer)
 
-	if peer == nil && !t.self.IsBot() {
+	if peer == nil && t.self != nil && !t.self.IsBot() {
 		var offsetPeer gotdTg.InputPeerClass
 
 		switch p := gotdTgPeer.(type) {
