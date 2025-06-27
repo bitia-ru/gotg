@@ -136,18 +136,22 @@ func (c *Chat) Description(ctx context.Context, tt tg.Tg) string {
 	return ""
 }
 
-func (c *Chat) SendMessage(ctx context.Context, text string) error {
+func (c *Chat) SendMessage(ctx context.Context, text string) (tg.MessageRef, error) {
 	t, ok := ctx.Value("gotd").(*Tg)
 
 	if !ok {
-		return errors.New("gotd api not found")
+		return nil, errors.New("gotd api not found")
 	}
 
 	sender := message.NewSender(t.api)
 
-	_, err := sender.To(c.asInputPeer()).Text(ctx, text)
+	u, err := sender.To(c.asInputPeer()).Text(ctx, text)
 
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	return t.messageRefFromUpdatesFromSentMessageReply(u, c), nil
 }
 
 func (c *Chat) RemoveMessages(ctx context.Context, ids ...int64) error {

@@ -75,18 +75,22 @@ func (u *User) IsBot() bool {
 	return u.User.Bot
 }
 
-func (u *User) SendMessage(ctx context.Context, text string) error {
+func (u *User) SendMessage(ctx context.Context, text string) (tg.MessageRef, error) {
 	t, ok := ctx.Value("gotd").(*Tg)
 
 	if !ok {
-		return errors.New("gotd api not found")
+		return nil, errors.New("gotd api not found")
 	}
 
 	sender := message.NewSender(t.api)
 
-	_, err := sender.To(u.AsInputPeer()).Text(ctx, text)
+	update, err := sender.To(u.AsInputPeer()).Text(ctx, text)
 
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	return t.messageRefFromUpdatesFromSentMessageReply(update, u), nil
 }
 
 func (u *User) RemoveMessages(ctx context.Context, ids ...int64) error {

@@ -29,9 +29,16 @@ type Message interface {
 
 	Photo(ctx context.Context, t Tg) (blobdb.Object, error)
 	ReplyToMsg(ctx context.Context, t Tg) (Message, error)
-	Reply(ctx context.Context, content string) error
+	Reply(ctx context.Context, t Tg, content string) (MessageRef, error)
 	MarkRead(ctx context.Context, t Tg) error
 	RelativeHistory(ctx context.Context, offset int64, limit int64) ([]Message, error)
 	Forward(ctx context.Context, t Tg, to Peer) error
 	ForwardWithOptions(ctx context.Context, t Tg, to Peer, options ForwardOptions) error
+}
+
+type MessageRef interface {
+	ID() int64
+	Where() Peer
+
+	Reply(ctx context.Context, t Tg, content string) (MessageRef, error)
 }

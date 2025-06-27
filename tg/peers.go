@@ -18,7 +18,7 @@ type Peer interface {
 	Slug() string
 	Type() PeerType
 
-	SendMessage(ctx context.Context, text string) error
+	SendMessage(ctx context.Context, text string) (MessageRef, error)
 	RemoveMessages(ctx context.Context, ids ...int64) error
 }
 

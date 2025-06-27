@@ -106,7 +106,7 @@ func main() {
 		fmt.Println(logMsg + ": " + m.Content())
 
 		if m.Where().Type() != tg.PeerTypeChannel {
-			_ = m.Reply(ctx, "Got it!")
+			_, _ = m.Reply(ctx, c, "Got it!")
 		}
 	}
 

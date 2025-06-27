@@ -279,27 +279,32 @@ func (m *Message) ReplyToMsg(ctx context.Context, tgT tg.Tg) (tg.Message, error)
 	return nil, errors.New("unexpected error")
 }
 
-func (m *Message) Reply(ctx context.Context, content string) error {
-	t, ok := ctx.Value("gotd").(*Tg)
+func (m *Message) Reply(ctx context.Context, tt tg.Tg, content string) (tg.MessageRef, error) {
+	t, ok := tt.(*Tg)
 
 	if !ok {
-		return errors.New("gotd api not found")
+		return nil, fmt.Errorf("wrong type: %T, expected *gotd.Tg", tt)
 	}
 
 	sender := message.NewSender(t.api)
 
 	var err error
+	var u gotdTg.UpdatesClass
 
 	switch m.Where().Type() {
 	case tg.PeerTypeUser:
-		_, err = sender.To(m.Where().(*User).AsInputPeer()).Reply(m.msg.ID).Text(ctx, content)
+		u, err = sender.To(m.Where().(*User).AsInputPeer()).Reply(m.msg.ID).Text(ctx, content)
 	case tg.PeerTypeChat:
-		_, err = sender.To(m.Where().(*Chat).asInputPeer()).Reply(m.msg.ID).Text(ctx, content)
+		u, err = sender.To(m.Where().(*Chat).asInputPeer()).Reply(m.msg.ID).Text(ctx, content)
 	case tg.PeerTypeChannel:
 		panic("not implemented")
 	}
 
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	return t.messageRefFromUpdatesFromSentMessageReply(u, m.Where()), nil
 }
 
 func (m *Message) RelativeHistory(ctx context.Context, offset int64, limit int64) ([]tg.Message, error) {

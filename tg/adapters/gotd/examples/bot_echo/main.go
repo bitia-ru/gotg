@@ -65,12 +65,12 @@ func main() {
 		case tg.ServiceMessageActionJoin:
 			switch m := msg.(type) {
 			case tg.ServiceMessageWithSubject:
-				_ = m.Subject().SendMessage(ctx, fmt.Sprintf("%s joined", m.Subject().Name()))
+				_, _ = m.Subject().SendMessage(ctx, fmt.Sprintf("%s joined", m.Subject().Name()))
 			}
 		case tg.ServiceMessageActionLeave:
 			switch m := msg.(type) {
 			case tg.ServiceMessageWithSubject:
-				_ = m.Subject().SendMessage(ctx, fmt.Sprintf("%s left", m.Subject().Name()))
+				_, _ = m.Subject().SendMessage(ctx, fmt.Sprintf("%s left", m.Subject().Name()))
 			}
 		}
 	}
@@ -99,7 +99,17 @@ func main() {
 		fmt.Println(logMsg + ": " + m.Content())
 
 		if m.Where().Type() != tg.PeerTypeChannel {
-			_ = m.Reply(ctx, m.Content())
+			var msgRef tg.MessageRef
+
+			msgRef, err = m.Reply(ctx, c, m.Content())
+
+			if err != nil {
+				fmt.Println("Failed to reply to message:", err)
+
+				return
+			}
+
+			_, _ = msgRef.Reply(ctx, c, "Echoecho")
 		}
 
 		if m.HasPhoto() {
