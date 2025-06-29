@@ -33,10 +33,10 @@ func (m ManagedMessage) MarkRead() error {
 	return m.Message.MarkRead(m.ctx, m.t)
 }
 
-func (m ManagedMessage) Forward(to Peer) error {
+func (m ManagedMessage) Forward(to Peer) (MessageRef, error) {
 	return m.Message.Forward(m.ctx, m.t, to)
 }
 
-func (m ManagedMessage) ForwardWithOptions(to Peer, options ForwardOptions) error {
+func (m ManagedMessage) ForwardWithOptions(to Peer, options ForwardOptions) (MessageRef, error) {
 	return m.Message.ForwardWithOptions(m.ctx, m.t, to, options)
 }

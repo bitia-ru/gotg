@@ -365,23 +365,25 @@ func (m *Message) RelativeHistory(ctx context.Context, offset int64, limit int64
 	return resultMessages, nil
 }
 
-func (m *Message) Forward(ctx context.Context, tt tg.Tg, to tg.Peer) error {
+func (m *Message) Forward(ctx context.Context, tt tg.Tg, to tg.Peer) (tg.MessageRef, error) {
 	return m.ForwardWithOptions(ctx, tt, to, tg.ForwardOptions{})
 }
 
-func (m *Message) ForwardWithOptions(ctx context.Context, tt tg.Tg, to tg.Peer, options tg.ForwardOptions) error {
+func (m *Message) ForwardWithOptions(ctx context.Context, tt tg.Tg, to tg.Peer, options tg.ForwardOptions) (tg.MessageRef, error) {
 	t, ok := tt.(*Tg)
 
 	if !ok {
-		return errors.New("wrong Tg implementation")
+		return nil, errors.New("wrong Tg implementation")
 	}
 
 	randomId, err := crypto.RandInt64(crypto.DefaultRand())
 	if err != nil {
-		return errors.Wrap(err, "generate random_id")
+		return nil, errors.Wrap(err, "generate random_id")
 	}
 
-	_, err = t.api.MessagesForwardMessages(ctx, &gotdTg.MessagesForwardMessagesRequest{
+	var u gotdTg.UpdatesClass
+
+	u, err = t.api.MessagesForwardMessages(ctx, &gotdTg.MessagesForwardMessagesRequest{
 		FromPeer:          m.Where().(Peer).asInputPeer(),
 		ToPeer:            to.(Peer).asInputPeer(),
 		ID:                []int{int(m.ID())},
@@ -390,7 +392,11 @@ func (m *Message) ForwardWithOptions(ctx context.Context, tt tg.Tg, to tg.Peer, 
 		DropMediaCaptions: options.DropMediaCaptions,
 	})
 
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	return t.messageRefFromUpdatesFromSentMessageReply(u, m.Where()), nil
 }
 
 func (t *Tg) fromGotdMessage(ctx context.Context, gotdMsg *gotdTg.Message) (tg.Message, error) {

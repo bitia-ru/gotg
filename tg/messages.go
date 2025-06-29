@@ -32,8 +32,8 @@ type Message interface {
 	Reply(ctx context.Context, t Tg, content string) (MessageRef, error)
 	MarkRead(ctx context.Context, t Tg) error
 	RelativeHistory(ctx context.Context, offset int64, limit int64) ([]Message, error)
-	Forward(ctx context.Context, t Tg, to Peer) error
-	ForwardWithOptions(ctx context.Context, t Tg, to Peer, options ForwardOptions) error
+	Forward(ctx context.Context, t Tg, to Peer) (MessageRef, error)
+	ForwardWithOptions(ctx context.Context, t Tg, to Peer, options ForwardOptions) (MessageRef, error)
 }
 
 type MessageRef interface {
