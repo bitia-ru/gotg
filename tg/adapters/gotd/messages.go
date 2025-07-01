@@ -44,7 +44,9 @@ func (m *Message) Content() string {
 }
 
 func (m *Message) IsForwarded() bool {
-	return m.FwdFromPeer != nil
+	_, ok := m.msg.GetFwdFrom()
+
+	return ok
 }
 
 func (m *Message) ForwardedFrom() tg.Peer {
@@ -52,7 +54,7 @@ func (m *Message) ForwardedFrom() tg.Peer {
 }
 
 func (m *Message) ForwardSourceID() int64 {
-	if m.IsForwarded() && m.ForwardedFrom().Type() == tg.PeerTypeChannel {
+	if m.IsForwarded() && m.ForwardedFrom() != nil && m.ForwardedFrom().Type() == tg.PeerTypeChannel {
 		return int64(m.msg.FwdFrom.ChannelPost)
 	}
 
