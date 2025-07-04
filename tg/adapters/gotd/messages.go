@@ -309,6 +309,36 @@ func (m *Message) Reply(ctx context.Context, tt tg.Tg, content string) (tg.Messa
 	return t.messageRefFromUpdatesFromSentMessageReply(u, m.Where()), nil
 }
 
+func (m *Message) ReplyFormatted(ctx context.Context, tt tg.Tg, chunk tg.MessageChunk) (tg.MessageRef, error) {
+	t, ok := tt.(*Tg)
+
+	if !ok {
+		return nil, fmt.Errorf("wrong type: %T, expected *gotd.Tg", tt)
+	}
+
+	sender := message.NewSender(t.api)
+
+	var err error
+	var u gotdTg.UpdatesClass
+
+	styledOptions := chunk.ToStyledTextOptions()
+
+	switch m.Where().Type() {
+	case tg.PeerTypeUser:
+		u, err = sender.To(m.Where().(*User).AsInputPeer()).Reply(m.msg.ID).StyledText(ctx, styledOptions...)
+	case tg.PeerTypeChat:
+		u, err = sender.To(m.Where().(*Chat).asInputPeer()).Reply(m.msg.ID).StyledText(ctx, styledOptions...)
+	case tg.PeerTypeChannel:
+		panic("not implemented")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return t.messageRefFromUpdatesFromSentMessageReply(u, m.Where()), nil
+}
+
 func (m *Message) RelativeHistory(ctx context.Context, offset int64, limit int64) ([]tg.Message, error) {
 	t, ok := ctx.Value("gotd").(*Tg)
 

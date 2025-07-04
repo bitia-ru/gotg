@@ -47,6 +47,25 @@ func (c *Channel) SendMessage(ctx context.Context, text string) (tg.MessageRef, 
 	return t.messageRefFromUpdatesFromSentMessageReply(u, c), nil
 }
 
+func (c *Channel) SendMessageFormatted(ctx context.Context, chunk tg.MessageChunk) (tg.MessageRef, error) {
+	t, ok := ctx.Value("gotd").(*Tg)
+
+	if !ok {
+		return nil, errors.New("gotd api not found")
+	}
+
+	sender := message.NewSender(t.api)
+
+	styledOptions := chunk.ToStyledTextOptions()
+	u, err := sender.To(c.AsInputPeer()).StyledText(ctx, styledOptions...)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return t.messageRefFromUpdatesFromSentMessageReply(u, c), nil
+}
+
 func (c *Channel) RemoveMessages(ctx context.Context, ids ...int64) error {
 	t, ok := ctx.Value("gotd").(*Tg)
 

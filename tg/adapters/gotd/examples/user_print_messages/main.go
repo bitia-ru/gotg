@@ -106,7 +106,15 @@ func main() {
 		fmt.Println(logMsg + ": " + m.Content())
 
 		if m.Where().Type() != tg.PeerTypeChannel {
-			_, _ = m.Reply(ctx, c, "Got it!")
+			// Demo of formatted message reply
+			formattedChunk := tg.Container(
+				tg.Text("Got it! "),
+				tg.Bold("Message"),
+				tg.Text(" received with "),
+				tg.Italic("formatting"),
+				tg.Text(" support!"),
+			)
+			_, _ = m.ReplyFormatted(ctx, c, formattedChunk)
 		}
 	}
 
