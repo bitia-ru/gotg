@@ -3,3 +3,8 @@
 /storage
 /.DS_Store
 /.env
+# Binary files
+formatting_demo
+user_print_messages
+formatting_validation
+russian_demo
