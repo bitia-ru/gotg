@@ -19,6 +19,7 @@ type Peer interface {
 	Type() PeerType
 
 	SendMessage(ctx context.Context, text string) (MessageRef, error)
+	SendMessageFormatted(ctx context.Context, chunk MessageChunk) (MessageRef, error)
 	RemoveMessages(ctx context.Context, ids ...int64) error
 }
 

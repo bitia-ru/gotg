@@ -50,6 +50,36 @@ func (mr MessageRef) Reply(ctx context.Context, tt tg.Tg, content string) (tg.Me
 	return t.messageRefFromUpdatesFromSentMessageReply(u, mr.Where()), nil
 }
 
+func (mr MessageRef) ReplyFormatted(ctx context.Context, tt tg.Tg, chunk tg.MessageChunk) (tg.MessageRef, error) {
+	t, ok := tt.(*Tg)
+
+	if !ok {
+		return nil, fmt.Errorf("wrong type: %T, expected *gotd.Tg", tt)
+	}
+
+	sender := message.NewSender(t.api)
+
+	var err error
+	var u gotdTg.UpdatesClass
+
+	styledOptions := chunk.ToStyledTextOptions()
+
+	switch mr.Where().Type() {
+	case tg.PeerTypeUser:
+		u, err = sender.To(mr.Where().(*User).AsInputPeer()).Reply(int(mr.ID())).StyledText(ctx, styledOptions...)
+	case tg.PeerTypeChat:
+		u, err = sender.To(mr.Where().(*Chat).asInputPeer()).Reply(int(mr.ID())).StyledText(ctx, styledOptions...)
+	case tg.PeerTypeChannel:
+		panic("not implemented")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return t.messageRefFromUpdatesFromSentMessageReply(u, mr.Where()), nil
+}
+
 func (t *Tg) messageRefFromUpdatesFromSentMessageReply(updates gotdTg.UpdatesClass, peer tg.Peer) tg.MessageRef {
 	messageRefFromGotdTgMessageClass := func(messageClass gotdTg.MessageClass) tg.MessageRef {
 		switch gotdTgMessage := messageClass.(type) {
